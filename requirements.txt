@@ -1,5 +1,8 @@
-openai
-streamlit
-python-dotenv
-pypdf
-python-docx
+openai>=1.0.0
+python-dotenv>=1.0.0
+pypdf>=3.17.0
+python-docx>=1.0.0
+flask>=3.0.0
+flask-socketio>=5.3.0
+fpdf2>=2.8.0
+beautifulsoup4>=4.12.0

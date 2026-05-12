@@ -10,9 +10,115 @@ Tools are grouped into two categories:
 All functions return strings only. Module-level state is shared across calls.
 """
 
+import ast
 import re
 import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
+
+MAX_TOOL_INPUT_CHARS = 50_000
+DEFAULT_GST_RATE = Decimal("0.18")
+DEFAULT_CURRENCY_SYMBOL = "$"
+DEFAULT_CURRENCY_CODE = "USD"
+
+
+def _safe_now() -> datetime | None: 
+    try:
+        return datetime.now()
+    except Exception:
+        return None
+
+
+def _format_date(fmt: str, fallback: str = "Date unavailable") -> str:
+    now = _safe_now()
+    if not now:
+        return fallback
+    try:
+        return now.strftime(fmt)
+    except Exception:
+        return fallback
+
+
+def _format_future_date(days: int, fmt: str, fallback: str = "30 days from invoice date") -> str:
+    now = _safe_now()
+    if not now:
+        return fallback
+    try:
+        return (now + timedelta(days=days)).strftime(fmt)
+    except Exception:
+        return fallback
+
+
+def _new_ref(prefix: str, length: int = 6) -> str:
+    return f"{prefix}-{uuid.uuid4().hex[:length].upper()}"
+
+
+def _detect_currency(items_text: str) -> tuple[str, str]:
+    """Detect currency symbol and code from item price strings."""
+    symbols = {"$": ("$", "USD"), "₹": ("₹", "INR"), "€": ("€", "EUR"), "£": ("£", "GBP")}
+    for sym, pair in symbols.items():
+        if sym in items_text:
+            return pair
+    return DEFAULT_CURRENCY_SYMBOL, DEFAULT_CURRENCY_CODE
+
+
+def _clean_text(value, field_name: str, *, required: bool = False, single_line: bool = False):
+    if value is None:
+        if required:
+            return "", "", f"Please provide {field_name}."
+        value = ""
+    try:
+        text = str(value)
+    except Exception:
+        return "", "", f"Please provide {field_name} as text."
+
+    if len(text) > MAX_TOOL_INPUT_CHARS:
+        text = text[:MAX_TOOL_INPUT_CHARS]
+        note = f"\n[Note: {field_name} was longer than {MAX_TOOL_INPUT_CHARS:,} characters and was truncated.]"
+    else:
+        note = ""
+
+    if single_line:
+        text = re.sub(r"\s+", " ", text).strip()
+    else:
+        text = text.strip()
+
+    if required and not text:
+        return "", note, f"Please provide {field_name}."
+    return text, note, ""
+
+
+def _clean_many(fields: dict, required: set[str] | None = None, single_line: set[str] | None = None):
+    required = required or set()
+    single_line = single_line or set()
+    cleaned = {}
+    notes = []
+    for name, value in fields.items():
+        text, note, error = _clean_text(
+            value,
+            name.replace("_", " "),
+            required=name in required,
+            single_line=name in single_line,
+        )
+        if error:
+            return {}, "", error
+        cleaned[name] = text
+        if note:
+            notes.append(note)
+    return cleaned, "".join(notes), ""
+
+
+def _clean_stringified_list(value: str) -> str:
+    text = value.strip()
+    if not (text.startswith("[") and text.endswith("]")):
+        return text
+    try:
+        parsed = ast.literal_eval(text)
+    except (ValueError, SyntaxError):
+        return text.strip("[]").replace("'", "").replace('"', "")
+    if isinstance(parsed, (list, tuple)):
+        return ", ".join(str(item).strip() for item in parsed if str(item).strip())
+    return text
 
 # ---------------------------------------------------------------------------
 # Module-level shared state
@@ -67,6 +173,34 @@ def generate_cv(
         Formatted CV as a string.
     """
     global _last_generated
+    fields, truncation_note, error = _clean_many(
+        {
+            "full_name": full_name,
+            "email": email,
+            "phone": phone,
+            "location": location,
+            "job_title": job_title,
+            "summary": summary,
+            "experience": experience,
+            "education": education,
+            "skills": skills,
+            "languages": languages,
+        },
+        required={"full_name", "email", "phone", "location", "job_title"},
+        single_line={"full_name", "email", "phone", "location", "job_title"},
+    )
+    if error:
+        return error
+    full_name = fields["full_name"]
+    email = fields["email"]
+    phone = fields["phone"]
+    location = fields["location"]
+    job_title = fields["job_title"]
+    summary = fields["summary"]
+    experience = fields["experience"]
+    education = fields["education"]
+    skills = _clean_stringified_list(fields["skills"])
+    languages = fields["languages"]
 
     if not summary:
         summary = (
@@ -91,12 +225,13 @@ def generate_cv(
     if not languages:
         languages = "English (Fluent)"
 
-    date_str = datetime.now().strftime("%B %d, %Y")
+    date_str = _format_date("%B %d, %Y")
     divider = "═" * 52
     thin = "─" * 52
+    centered_name = full_name.upper().center(52)
 
     output = f"""{divider}
-                   {full_name.upper()}
+{centered_name}
 {divider}
 {job_title}
 📧 {email}  |  📞 {phone}  |  📍 {location}
@@ -125,7 +260,7 @@ LANGUAGES
 {divider}
 Generated by Hyperzod Document Agent
 {date_str}
-{divider}"""
+{divider}{truncation_note}"""
 
     _last_generated["type"] = "cv"
     _last_generated["content"] = output
@@ -164,13 +299,47 @@ def generate_cover_letter(
         Formatted cover letter as a string.
     """
     global _last_generated
+    fields, truncation_note, error = _clean_many(
+        {
+            "full_name": full_name,
+            "email": email,
+            "phone": phone,
+            "job_title": job_title,
+            "company_name": company_name,
+            "hiring_manager": hiring_manager,
+            "key_skills": key_skills,
+            "why_company": why_company,
+            "years_experience": years_experience,
+        },
+        required={"full_name", "email", "phone", "job_title", "company_name"},
+        single_line={
+            "full_name",
+            "email",
+            "phone",
+            "job_title",
+            "company_name",
+            "hiring_manager",
+            "years_experience",
+        },
+    )
+    if error:
+        return error
+    full_name = fields["full_name"]
+    email = fields["email"]
+    phone = fields["phone"]
+    job_title = fields["job_title"]
+    company_name = fields["company_name"]
+    hiring_manager = fields["hiring_manager"] or "Hiring Manager"
+    key_skills = _clean_stringified_list(fields["key_skills"])
+    why_company = fields["why_company"]
+    years_experience = fields["years_experience"] or "several"
 
     if not key_skills:
         key_skills = "problem-solving, communication, and leadership"
     if not why_company:
         why_company = "its reputation for innovation and excellence"
 
-    date_str = datetime.now().strftime("%B %d, %Y")
+    date_str = _format_date("%B %d, %Y")
     thin = "─" * 52
 
     output = f"""{full_name}
@@ -200,7 +369,7 @@ Warm regards,
 
 {thin}
 Generated by Hyperzod Document Agent
-{date_str}"""
+{date_str}{truncation_note}"""
 
     _last_generated["type"] = "cover_letter"
     _last_generated["content"] = output
@@ -237,6 +406,30 @@ def generate_proposal(
         Formatted business proposal as a string.
     """
     global _last_generated
+    fields, truncation_note, error = _clean_many(
+        {
+            "project_title": project_title,
+            "prepared_by": prepared_by,
+            "prepared_for": prepared_for,
+            "problem_statement": problem_statement,
+            "proposed_solution": proposed_solution,
+            "timeline": timeline,
+            "budget": budget,
+            "deliverables": deliverables,
+        },
+        required={"project_title", "prepared_by", "prepared_for"},
+        single_line={"project_title", "prepared_by", "prepared_for"},
+    )
+    if error:
+        return error
+    project_title = fields["project_title"]
+    prepared_by = fields["prepared_by"]
+    prepared_for = fields["prepared_for"]
+    problem_statement = fields["problem_statement"]
+    proposed_solution = fields["proposed_solution"]
+    timeline = fields["timeline"]
+    budget = fields["budget"]
+    deliverables = fields["deliverables"]
 
     if not problem_statement:
         problem_statement = (
@@ -266,8 +459,8 @@ def generate_proposal(
             "• [Deliverable 3 — description and format]"
         )
 
-    date_str = datetime.now().strftime("%B %d, %Y")
-    ref = f"PROP-{uuid.uuid4().hex[:6].upper()}"
+    date_str = _format_date("%B %d, %Y")
+    ref = _new_ref("PROP", 6)
     divider = "═" * 52
     thin = "─" * 52
 
@@ -323,7 +516,7 @@ Title:     _______________________
 {divider}
 Generated by Hyperzod Document Agent
 {date_str}
-{divider}"""
+{divider}{truncation_note}"""
 
     _last_generated["type"] = "proposal"
     _last_generated["content"] = output
@@ -362,6 +555,32 @@ def generate_report(
         Formatted project report as a string.
     """
     global _last_generated
+    fields, truncation_note, error = _clean_many(
+        {
+            "report_title": report_title,
+            "prepared_by": prepared_by,
+            "project_name": project_name,
+            "executive_summary": executive_summary,
+            "objectives": objectives,
+            "methodology": methodology,
+            "findings": findings,
+            "recommendations": recommendations,
+            "conclusion": conclusion,
+        },
+        required={"report_title", "prepared_by"},
+        single_line={"report_title", "prepared_by", "project_name"},
+    )
+    if error:
+        return error
+    report_title = fields["report_title"]
+    prepared_by = fields["prepared_by"]
+    project_name = fields["project_name"]
+    executive_summary = fields["executive_summary"]
+    objectives = fields["objectives"]
+    methodology = fields["methodology"]
+    findings = fields["findings"]
+    recommendations = fields["recommendations"]
+    conclusion = fields["conclusion"]
 
     proj = project_name if project_name else "[Project Name]"
     if not executive_summary:
@@ -377,8 +596,8 @@ def generate_report(
     if not conclusion:
         conclusion = "[Summarize the overall outcome, lessons learned, and the path forward.]"
 
-    date_str = datetime.now().strftime("%B %d, %Y")
-    report_id = f"RPT-{uuid.uuid4().hex[:8].upper()}"
+    date_str = _format_date("%B %d, %Y")
+    report_id = _new_ref("RPT", 8)
     divider = "═" * 52
     thin = "─" * 52
 
@@ -420,7 +639,7 @@ Report ID:   {report_id}
 End of Report
 Generated by Hyperzod Document Agent
 {date_str}
-{divider}"""
+{divider}{truncation_note}"""
 
     _last_generated["type"] = "report"
     _last_generated["content"] = output
@@ -457,57 +676,96 @@ def generate_invoice(
         Formatted invoice with computed totals as a string.
     """
     global _last_generated
+    fields, truncation_note, error = _clean_many(
+        {
+            "business_name": business_name,
+            "business_email": business_email,
+            "client_name": client_name,
+            "client_email": client_email,
+            "items": items,
+            "due_date": due_date,
+            "payment_method": payment_method,
+            "notes": notes,
+        },
+        required={"business_name", "business_email", "client_name", "client_email", "items"},
+        single_line={
+            "business_name",
+            "business_email",
+            "client_name",
+            "client_email",
+            "due_date",
+            "payment_method",
+        },
+    )
+    if error:
+        return error
+    business_name = fields["business_name"]
+    business_email = fields["business_email"]
+    client_name = fields["client_name"]
+    client_email = fields["client_email"]
+    items = fields["items"]
+    due_date = fields["due_date"]
+    payment_method = fields["payment_method"] or "Bank Transfer"
+    notes = fields["notes"]
 
     if not due_date:
-        due_date = (datetime.now() + timedelta(days=30)).strftime("%d %B %Y")
+        due_date = _format_future_date(30, "%d %B %Y")
     if not notes:
         notes = "Thank you for your business. Payment within due date is appreciated."
 
-    invoice_number = f"INV-{datetime.now().strftime('%Y%m')}-{uuid.uuid4().hex[:4].upper()}"
-    date_str = datetime.now().strftime("%B %d, %Y")
+    currency_symbol, currency_code = _detect_currency(items)
+    invoice_number = f"INV-{_format_date('%Y%m', '000000')}-{uuid.uuid4().hex[:4].upper()}"
+    date_str = _format_date("%B %d, %Y")
     divider = "═" * 62
     thin = "─" * 62
 
     # Parse items
     parsed_items = []
-    subtotal = 0.0
-    placeholder_used = False
+    skipped_lines = []
+    subtotal = Decimal("0.00")
 
     for line in items.strip().splitlines():
         line = line.strip()
         if not line:
             continue
         parts = [p.strip() for p in line.split("|")]
+        if len(parts) != 3 or not all(parts):
+            skipped_lines.append(f"[SKIPPED: malformed line] {line}")
+            continue
         try:
-            if len(parts) >= 3:
-                name = parts[0]
-                qty = float(parts[1])
-                unit_price = float(parts[2])
-                line_total = qty * unit_price
-                subtotal += line_total
-                parsed_items.append((name, qty, unit_price, line_total))
-            else:
-                raise ValueError
-        except (ValueError, IndexError):
-            placeholder_used = True
-            parsed_items.append(("[Item Description]", 1, 0.0, 0.0))
+            name = parts[0]
+            qty = Decimal(re.sub(r"[^\d.\-]", "", parts[1]))
+            unit_price = Decimal(re.sub(r"[^\d.\-]", "", parts[2]))
+            if qty <= 0 or unit_price < 0:
+                raise InvalidOperation
+            line_total = (qty * unit_price).quantize(Decimal("0.01"))
+            subtotal = (subtotal + line_total).quantize(Decimal("0.01"))
+            parsed_items.append((name, qty, unit_price.quantize(Decimal("0.01")), line_total))
+        except (InvalidOperation, ValueError):
+            skipped_lines.append(f"[SKIPPED: malformed line] {line}")
 
-    if not parsed_items or placeholder_used:
-        parsed_items = [
-            ("Website Design", 1, 50000.0, 50000.0),
-            ("SEO Setup", 1, 15000.0, 15000.0),
-        ]
-        subtotal = 65000.0
+    if not parsed_items:
+        return (
+            "Please provide at least one valid invoice item in the format "
+            "'Item name | quantity | unit price'.\n"
+            + ("\n".join(skipped_lines) if skipped_lines else "")
+            + truncation_note
+        )
 
-    tax = subtotal * 0.18
-    total = subtotal + tax
+    gst_rate = DEFAULT_GST_RATE
+    tax = (subtotal * gst_rate).quantize(Decimal("0.01"))
+    total = (subtotal + tax).quantize(Decimal("0.01"))
 
     # Build items table
     header = f"{'DESCRIPTION':<32} {'QTY':>5} {'UNIT PRICE':>12} {'TOTAL':>10}"
     item_lines = []
     for name, qty, up, lt in parsed_items:
-        item_lines.append(f"{name:<32} {qty:>5.0f} {'₹'+f'{up:,.2f}':>12} {'₹'+f'{lt:,.2f}':>10}")
+        qty_display = f"{qty.normalize():f}".rstrip("0").rstrip(".")
+        up_str = f"{currency_symbol}{float(up):,.2f}"
+        lt_str = f"{currency_symbol}{float(lt):,.2f}"
+        item_lines.append(f"{name[:32]:<32} {qty_display:>5} {up_str:>12} {lt_str:>10}")
     items_block = "\n".join(item_lines)
+    skipped_block = "\n".join(skipped_lines)
 
     output = f"""{divider}
 INVOICE
@@ -528,11 +786,12 @@ ITEMS
 {header}
 {thin}
 {items_block}
+{skipped_block}
 {thin}
-{'Subtotal:':>50} {'₹'+f'{subtotal:,.2f}':>10}
-{'GST (18%):':>50} {'₹'+f'{tax:,.2f}':>10}
-{divider}
-{'TOTAL DUE:':>50} {'₹'+f'{total:,.2f}':>10}
+        {'Subtotal:':>50} {currency_symbol + f'{float(subtotal):,.2f}':>10}
+        {'GST (18%):':>50} {currency_symbol + f'{float(tax):,.2f}':>10}
+        {divider}
+        {'TOTAL DUE:':>50} {currency_symbol + f'{float(total):,.2f}':>10}
 {divider}
 
 Payment Method: {payment_method}
@@ -544,7 +803,7 @@ NOTES
 {thin}
 Generated by Hyperzod Document Agent
 {date_str}
-All amounts in INR (₹). Prices include applicable taxes."""
+All amounts in {currency_code} ({currency_symbol}). Prices include applicable taxes.{truncation_note}"""
 
     _last_generated["type"] = "invoice"
     _last_generated["content"] = output
@@ -579,6 +838,26 @@ def generate_email(
         Formatted email template as a string.
     """
     global _last_generated
+    fields, truncation_note, error = _clean_many(
+        {
+            "email_type": email_type,
+            "sender_name": sender_name,
+            "recipient_name": recipient_name,
+            "subject": subject,
+            "context": context,
+            "tone": tone,
+        },
+        required={"email_type", "sender_name"},
+        single_line={"email_type", "sender_name", "recipient_name", "subject", "tone"},
+    )
+    if error:
+        return error
+    email_type = fields["email_type"].lower().strip()
+    sender_name = fields["sender_name"]
+    recipient_name = fields["recipient_name"] or "Team"
+    subject = fields["subject"]
+    context = fields["context"]
+    tone = fields["tone"].lower().strip() or "professional"
 
     # Greeting and closing based on tone
     tone_map = {
@@ -690,7 +969,6 @@ def generate_email(
     if context:
         body = f"[Context: {context}]\n\n" + body
 
-    date_str = datetime.now().strftime("%B %d, %Y")
     divider = "═" * 52
     thin = "─" * 52
     type_label = email_type.replace("_", " ").title()
@@ -712,7 +990,7 @@ Subject: {subject}
 
 {thin}
 [Customize bracketed placeholders before sending]
-Generated by Hyperzod Document Agent"""
+Generated by Hyperzod Document Agent{truncation_note}"""
 
     _last_generated["type"] = "email"
     _last_generated["content"] = output
@@ -739,14 +1017,31 @@ def load_and_summarize(
         Formatted summary with document statistics as a string.
     """
     global _document
+    fields, truncation_note, error = _clean_many(
+        {
+            "content": content,
+            "filename": filename,
+            "detail_level": detail_level,
+        },
+        required={"content"},
+        single_line={"filename", "detail_level"},
+    )
+    if error:
+        return error
+    content = fields["content"]
+    filename = fields["filename"] or "document.txt"
+    detail_level = fields["detail_level"].lower().strip() or "medium"
+    if detail_level not in {"brief", "medium", "detailed"}:
+        detail_level = "medium"
 
     _document["filename"] = filename
     _document["content"] = content
     _document["loaded"] = True
 
-    word_count = len(content.split())
+    words = re.findall(r"\S+", content)
+    word_count = len(words)
     char_count = len(content)
-    sentence_count = len([s for s in content.split(".") if s.strip()])
+    sentence_count = len([s for s in re.split(r"[.!?]+", content) if s.strip()])
     para_count = len([p for p in content.split("\n\n") if p.strip()])
 
     thin = "─" * 49
@@ -757,30 +1052,30 @@ def load_and_summarize(
     )
 
     if detail_level == "brief":
-        preview_words = content.split()[:150]
+        preview_words = words[:150]
         preview = " ".join(preview_words)
         if word_count > 150:
             preview += " [...]"
         summary_body = preview
 
     elif detail_level == "detailed":
-        preview_words = content.split()[:1000]
+        preview_words = words[:1000]
         preview = " ".join(preview_words)
         if word_count > 1000:
             preview += " [...]"
         paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
         para_breakdown = "\n\n".join(
-            f"Para {i+1}: {p.split('.')[0].strip()}."
+            f"Para {i+1}: {re.split(r'[.!?]+', p)[0].strip()}."
             for i, p in enumerate(paragraphs[:6])
         )
         summary_body = preview + "\n\n--- PARAGRAPH BREAKDOWN ---\n" + para_breakdown
 
     else:  # medium (default)
-        preview_words = content.split()[:400]
+        preview_words = words[:400]
         preview = " ".join(preview_words)
         if word_count > 400:
             preview += " [...]"
-        long_words = [w.lower().strip(".,;:!?") for w in content.split() if len(w) > 5]
+        long_words = [w.lower().strip(".,;:!?") for w in words if len(w) > 5]
         stopwords_ex = {"their", "there", "these", "those", "which", "about", "would", "could", "should"}
         unique_words = list(dict.fromkeys(w for w in long_words if w not in stopwords_ex))[:5]
         themes = ", ".join(unique_words) if unique_words else "[unable to extract]"
@@ -799,6 +1094,7 @@ def load_and_summarize(
         f"• Ask questions about this document\n"
         f"• Ask me to edit or improve sections\n"
         f"• Export the content as formatted markdown"
+        f"{truncation_note}"
     )
 
     return output
@@ -821,8 +1117,11 @@ def answer_from_document(question: str) -> str:
         Relevant sentences from the document as a formatted string.
     """
     global _document
+    question, truncation_note, error = _clean_text(question, "question", required=True)
+    if error:
+        return error
 
-    if not _document["loaded"]:
+    if not _document.get("loaded") or not _document.get("content", "").strip():
         return (
             "⚠️ No document loaded yet.\n"
             "Please paste your document content and I will load and "
@@ -839,8 +1138,13 @@ def answer_from_document(question: str) -> str:
         for w in question.split()
         if w.lower() not in stopwords
     ]
+    if not tokens:
+        return "Please ask a more specific question about the loaded document."
 
-    sentences = [s.strip() for s in _document["content"].split(".") if s.strip()]
+    content = _document.get("content", "")
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", content) if s.strip()]
+    if not sentences and content.strip():
+        sentences = [content.strip()]
 
     scored = []
     for sent in sentences:
@@ -861,7 +1165,10 @@ def answer_from_document(question: str) -> str:
             f"Loaded document: {filename}"
         )
 
-    answer_body = "\n\n".join(f"{s.strip()}." for s in top)
+    answer_body = "\n\n".join(
+        s.strip() if s.strip().endswith((".", "!", "?")) else s.strip() + "."
+        for s in top
+    )
 
     return (
         f"🔍 ANSWER FROM DOCUMENT: {filename}\n"
@@ -872,6 +1179,7 @@ def answer_from_document(question: str) -> str:
         f"{thin}\n"
         f"[Answer sourced from: {filename}]\n"
         f"[Only document content used — no external knowledge]"
+        f"{truncation_note}"
     )
 
 
@@ -895,6 +1203,19 @@ def edit_and_improve(
         Improved content with word count comparison as a string.
     """
     global _last_generated
+    fields, truncation_note, error = _clean_many(
+        {
+            "content": content,
+            "improvement_type": improvement_type,
+            "instruction": instruction,
+        },
+        single_line={"improvement_type"},
+    )
+    if error:
+        return error
+    content = fields["content"]
+    improvement_type = fields["improvement_type"].lower().strip() or "general"
+    instruction = fields["instruction"]
 
     if not content:
         content = _last_generated.get("content", "")
@@ -909,19 +1230,17 @@ def edit_and_improve(
 
     if improvement_type == "formal":
         replacements = {
-            "I think": "I believe",
-            "i think": "I believe",
-            " get ": " obtain ",
-            " use ": " utilize ",
-            " show ": " demonstrate ",
-            " help ": " assist ",
-            " need ": " require ",
-            " talk ": " discuss ",
-            "find out": "ascertain",
-            "Find out": "Ascertain",
+            r"\bi think\b": "I believe",
+            r"\bget\b": "obtain",
+            r"\buse\b": "utilize",
+            r"\bshow\b": "demonstrate",
+            r"\bhelp\b": "assist",
+            r"\bneed\b": "require",
+            r"\btalk\b": "discuss",
+            r"\bfind out\b": "ascertain",
         }
-        for old, new in replacements.items():
-            improved_content = improved_content.replace(old, new)
+        for pattern, new in replacements.items():
+            improved_content = re.sub(pattern, new, improved_content, flags=re.IGNORECASE)
 
     elif improvement_type == "concise":
         verbose_map = {
@@ -954,15 +1273,15 @@ def edit_and_improve(
         )
 
     elif improvement_type == "grammar":
-        lines = improved_content.split(". ")
+        sentences = re.split(r"(?<=[.!?])\s+", improved_content)
         fixed = []
-        for line in lines:
-            line = line.strip()
-            if line:
-                line = line[0].upper() + line[1:]
-                if not line.endswith((".", "!", "?")):
-                    line += "."
-            fixed.append(line)
+        for sent in sentences:
+            sent = sent.strip()
+            if sent:
+                sent = sent[0].upper() + sent[1:]
+                if not sent.endswith((".", "!", "?")):
+                    sent += "."
+            fixed.append(sent)
         improved_content = " ".join(fixed)
         improved_content += (
             "\n\n[GRAMMAR NOTE: Sentences capitalized and punctuated. "
@@ -997,9 +1316,10 @@ def edit_and_improve(
         f"{thin}"
         f"{instruction_line}\n"
         f"[Review all [BRACKETED] notes before finalizing]"
+        f"{truncation_note}"
     )
 
-    _last_generated["type"] = _last_generated.get("type", "edited")
+    _last_generated["type"] = _last_generated.get("type") or "edited"
     _last_generated["content"] = improved_content
     return output
 
@@ -1022,11 +1342,22 @@ def export_as_markdown(
         Full export output including BEGIN/END markers as a string.
     """
     global _last_generated
+    fields, truncation_note, error = _clean_many(
+        {
+            "content": content,
+            "document_title": document_title,
+        },
+        single_line={"document_title"},
+    )
+    if error:
+        return error
+    content = fields["content"]
+    document_title = fields["document_title"]
 
     if not content:
         content = _last_generated.get("content", "")
     if not content:
-        return "No content to export."
+        return "No content to export. Please provide content or generate a document first."
 
     if not document_title:
         type_map = {
@@ -1040,7 +1371,7 @@ def export_as_markdown(
         }
         document_title = type_map.get(_last_generated.get("type", ""), "Document")
 
-    date_str = datetime.now().strftime("%B %d, %Y")
+    date_str = _format_date("%B %d, %Y")
 
     # Convert plain-text formatting to markdown
     lines = content.splitlines()
@@ -1069,6 +1400,8 @@ def export_as_markdown(
             md_lines.append(line)
 
     md_body = "\n".join(md_lines)
+    if not md_body.strip():
+        md_body = content.strip() or "_No exportable content was provided._"
 
     # Header and footer
     header = (
@@ -1094,7 +1427,7 @@ def export_as_markdown(
         f"═══ END MARKDOWN ═══\n\n"
         f"{thin}\n"
         f"{word_count} words | Ready to paste into Notion, GitHub, or any markdown editor."
+        f"{truncation_note}"
     )
 
     return output
-

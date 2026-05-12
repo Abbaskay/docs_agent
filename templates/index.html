@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocAgent — AI Document Workspace</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📄</text></svg>">
+</head>
+<body>
+
+<!-- ─── LANDING PAGE ─── -->
+<div id="landingPage">
+  <div class="lp-topnav">
+    <div class="lp-topnav-logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span>DocAgent</span>
+    </div>
+  </div>
+
+  <main class="lp-main">
+    <div class="lp-topbar">
+      <div class="lp-prompt-wrapper">
+        <div class="lp-prompt">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <textarea id="landingInput" placeholder="Describe the document you need…" rows="1"></textarea>
+          <button id="landingSend" class="landing-send" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="lp-categories">
+      <button class="lp-cat active">All</button>
+      <button class="lp-cat">Resume</button>
+      <button class="lp-cat">Cover Letter</button>
+      <button class="lp-cat">Proposal</button>
+      <button class="lp-cat">Report</button>
+      <button class="lp-cat">Invoice</button>
+      <button class="lp-cat">Email</button>
+    </div>
+
+    <div class="lp-grid" id="templateGrid">
+      <div class="lp-card lp-card-blank" data-type="blank">
+        <div class="lpc-blank-icon">+</div>
+        <div class="lpc-label">Blank Document</div>
+        <div class="lpc-desc">Start from scratch with AI</div>
+      </div>
+
+      <div class="lp-card" data-type="resume" data-prompt="Create a professional resume with strong achievement-based bullet points. Name: Alex Chen. Role: Software Engineer. 4 years experience in React, Node.js, TypeScript.">
+        <div class="lpc-thumb lpc-thumb-resume">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:18px;height:18px;border-radius:50%;background:#c4c4c8"></div><div><div class="lpt-name" style="margin:0">Alex Chen</div><div style="font-size:5pt;color:#8e8e93">Software Engineer</div></div></div>
+          <div class="lpt-sep"></div>
+          <div class="lpt-head">Experience</div>
+          <div style="display:flex;justify-content:space-between"><div class="lpt-line lpt-w70"></div><div class="lpt-line lpt-w25"></div></div>
+          <div class="lpt-line lpt-w85"></div>
+          <div class="lpt-line lpt-w60"></div>
+          <div class="lpt-line lpt-w78"></div>
+          <div class="lpt-head">Skills</div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap"><span style="background:#d2d2d6;border-radius:2px;height:4px;width:20%"></span><span style="background:#d2d2d6;border-radius:2px;height:4px;width:15%"></span><span style="background:#d2d2d6;border-radius:2px;height:4px;width:25%"></span></div>
+        </div>
+        <div class="lpc-label">CV / Resume</div>
+        <div class="lpc-desc">ATS-friendly FAANG-style</div>
+      </div>
+
+      <div class="lp-card" data-type="cover_letter" data-prompt="Write a professional cover letter. Name: Jordan Smith. Position: Senior Developer. Company: Google. Highlight 5 years full-stack experience, React, and team leadership.">
+        <div class="lpc-thumb lpc-thumb-letter">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:18px;height:18px;border-radius:50%;background:#c4b9a8"></div><div><div class="lpt-name" style="margin:0">Jordan Smith</div></div></div>
+          <div class="lpt-sep"></div>
+          <div style="font-size:5pt;color:#8e8e93;margin-bottom:2px">Google • Senior Developer</div>
+          <div class="lpt-line lpt-w90"></div>
+          <div class="lpt-line lpt-w85"></div>
+          <div class="lpt-line lpt-w75"></div>
+          <div class="lpt-line lpt-w80"></div>
+          <div class="lpt-sep"></div>
+          <div class="lpt-line lpt-w35" style="margin-left:auto"></div>
+        </div>
+        <div class="lpc-label">Cover Letter</div>
+        <div class="lpc-desc">Professional &amp; tailored</div>
+      </div>
+
+      <div class="lp-card" data-type="proposal" data-prompt="Create a business proposal for a digital marketing agency. Company: GrowthLab. Client: A local retail chain. Budget: $15,000. Timeline: 3 months.">
+        <div class="lpc-thumb lpc-thumb-proposal">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:18px;height:18px;border-radius:4px;background:#b0b8c8"></div><div><div class="lpt-name" style="margin:0">GrowthLab</div></div></div>
+          <div class="lpt-sep"></div>
+          <div class="lpt-head">Executive Summary</div>
+          <div class="lpt-line lpt-w90"></div>
+          <div class="lpt-line lpt-w80"></div>
+          <div class="lpt-head">Scope of Work</div>
+          <div class="lpt-line lpt-w85"></div>
+          <div class="lpt-line lpt-w60"></div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px"><div class="lpt-line lpt-w35"></div><div class="lpt-line lpt-w20"></div></div>
+        </div>
+        <div class="lpc-label">Business Proposal</div>
+        <div class="lpc-desc">Modern corporate layout</div>
+      </div>
+
+      <div class="lp-card" data-type="report" data-prompt="Generate a project report for Q4 2025. Project: Cloud Migration. Prepared by: Sarah Lee. Include executive summary, methodology, results, and recommendations.">
+        <div class="lpc-thumb lpc-thumb-report">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:18px;height:18px;border-radius:4px;background:#c4b8c8"></div><div><div class="lpt-name" style="margin:0">Q4 Cloud Migration</div></div></div>
+          <div class="lpt-sep"></div>
+          <div class="lpt-head">Abstract</div>
+          <div class="lpt-line lpt-w95"></div>
+          <div class="lpt-line lpt-w88"></div>
+          <div class="lpt-head">Methodology</div>
+          <div class="lpt-line lpt-w80"></div>
+          <div class="lpt-line lpt-w70"></div>
+          <div class="lpt-head">Findings</div>
+          <div style="display:flex;gap:4px"><div class="lpt-line lpt-w45"></div><div class="lpt-line lpt-w25"></div></div>
+        </div>
+        <div class="lpc-label">Project Report</div>
+        <div class="lpc-desc">Academic &amp; structured</div>
+      </div>
+
+      <div class="lp-card" data-type="invoice" data-prompt="Create an invoice. Business: TechStudio. Client: Acme Corp. Items: Web Design 5 x $400, Hosting 12 x $50, SEO 1 x $1200.">
+        <div class="lpc-thumb lpc-thumb-invoice">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div class="lpt-name" style="margin:0;font-size:6pt">INVOICE</div><div style="font-size:5pt;color:#8e8e93">#INV-001</div></div>
+          <div class="lpt-sep"></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><div class="lpt-line lpt-w40"></div><div style="font-size:5pt;color:#8e8e93">$2,000</div></div>
+          <div class="lpt-line lpt-w30"></div>
+          <div class="lpt-sep"></div>
+          <div style="display:flex;justify-content:space-between;margin:2px 0"><div><div class="lpt-line lpt-w55"></div><div class="lpt-line lpt-w35"></div></div><div style="font-size:5pt;color:#8e8e93">$600</div></div>
+          <div class="lpt-sep"></div>
+          <div style="display:flex;justify-content:flex-end;margin-top:4px"><div class="lpt-line lpt-w30" style="height:5px;background:#1d1d1f"></div></div>
+        </div>
+        <div class="lpc-label">Invoice</div>
+        <div class="lpc-desc">Clean &amp; professional</div>
+      </div>
+
+      <div class="lp-card" data-type="email" data-prompt="Write a professional follow-up email after a job interview. Name: Sarah. Company: Google. Position: Product Manager. Keep warm and professional.">
+        <div class="lpc-thumb lpc-thumb-email">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:14px;height:10px;border-radius:2px;background:#aeaeb2"></div><div class="lpt-name" style="margin:0;font-size:6pt">Follow-up</div></div>
+          <div class="lpt-sep"></div>
+          <div style="font-size:5pt;color:#8e8e93;margin-bottom:2px">To: Hiring Manager</div>
+          <div class="lpt-line lpt-w90"></div>
+          <div class="lpt-line lpt-w85"></div>
+          <div class="lpt-line lpt-w70"></div>
+          <div class="lpt-line lpt-w80"></div>
+          <div class="lpt-sep"></div>
+          <div class="lpt-line lpt-w30"></div>
+        </div>
+        <div class="lpc-label">Email Template</div>
+        <div class="lpc-desc">AI-crafted messaging</div>
+      </div>
+
+      <div class="lp-card lp-card-upload" id="landingUploadCard">
+        <div class="lpc-upload-content">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="lpc-label">Upload Document</div>
+          <div class="lpc-desc">PDF, DOCX, or TXT</div>
+          <div id="landingFileInfo" class="lpc-file hidden">
+            <span id="landingFileName"></span>
+            <button id="landingClearFile" class="uz-clear">✕</button>
+          </div>
+        </div>
+        <input type="file" id="landingFileInput" accept=".pdf,.docx,.txt" hidden>
+      </div>
+    </div>
+  </main>
+
+  <div id="detectionBadge" class="detection-badge hidden">
+    <span class="db-dot"></span>
+    <span id="detectionLabel">Detected: Resume</span>
+  </div>
+</div>
+
+<!-- ─── WORKSPACE ─── -->
+<div id="workspace" class="hidden">
+  <aside id="chatPanel">
+    <div class="panel-top">
+      <div class="panel-header">
+        <button id="backBtn" class="icon-btn" title="Back to home">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        </button>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span class="ph-title">DocAgent</span>
+        <span id="docTypeBadge" class="doc-type-badge">Resume</span>
+      </div>
+      <div id="chatMessages"></div>
+      <div id="suggestions" class="suggestions hidden"></div>
+    </div>
+    <div id="thinkingPanel" class="thinking-panel hidden">
+      <span class="dot"></span><span>Generating…</span>
+    </div>
+    <div id="inputArea">
+      <div class="input-row">
+        <textarea id="chatInput" placeholder="Ask me to edit or improve…" rows="1"></textarea>
+        <button id="sendBtn" class="send-btn" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div class="ws-extras">
+        <label class="ws-upload-label" id="wsUploadBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Attach file
+        </label>
+        <input type="file" id="wsFileInput" accept=".pdf,.docx,.txt" hidden>
+        <div id="wsFileInfo" class="ws-file-badge hidden">
+          <span id="wsFileName"></span>
+          <button id="wsClearFile" class="uz-clear">✕</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main id="editorPanel">
+    <div id="editorContainer">
+      <div id="floatingToolbar">
+        <div class="tb-scroll">
+          <div class="tb-row">
+            <button id="backBtnEditor" class="tb-btn" title="Back to home" style="font-size:.7rem">←</button>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span id="editorDocType" style="font-size:.65rem;font-weight:600;color:rgba(255,255,255,0.8);white-space:nowrap;letter-spacing:-0.01em">Document</span>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group">
+              <button class="tb-btn" id="undoBtn" title="Undo (⌘Z)">↩</button>
+              <button class="tb-btn" id="redoBtn" title="Redo (⇧⌘Z)">↪</button>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group">
+              <select class="tb-select" id="styleSelect" title="Paragraph style">
+                <option value="p">Normal</option>
+                <option value="h1">H1</option>
+                <option value="h2">H2</option>
+                <option value="h3">H3</option>
+                <option value="blockquote">Quote</option>
+                <option value="pre">Code</option>
+              </select>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group">
+              <select class="tb-select" id="fontSelect" title="Font family">
+                <option value="Calibri">Calibri</option>
+                <option value="Arial">Arial</option>
+                <option value="'Times New Roman'">Times</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Inter, sans-serif">Inter</option>
+                <option value="'Courier New', monospace">Mono</option>
+              </select>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group">
+              <select class="tb-select tb-size" id="sizeSelect" title="Font size">
+                <option value="8">8</option>
+                <option value="10">10</option>
+                <option value="12" selected>12</option>
+                <option value="14">14</option>
+                <option value="16">16</option>
+                <option value="18">18</option>
+                <option value="20">20</option>
+                <option value="22">22</option>
+                <option value="24">24</option>
+                <option value="28">28</option>
+                <option value="32">32</option>
+                <option value="36">36</option>
+                <option value="48">48</option>
+                <option value="72">72</option>
+              </select>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group">
+              <button class="tb-btn" id="boldBtn" title="Bold (⌘B)"><b>B</b></button>
+              <button class="tb-btn" id="italicBtn" title="Italic (⌘I)"><i>I</i></button>
+              <button class="tb-btn" id="underlineBtn" title="Underline (⌘U)"><u>U</u></button>
+              <button class="tb-btn" id="strikeBtn" title="Strikethrough"><s>S</s></button>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group tb-color-group">
+              <label class="tb-color-label" title="Text color">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 10H3l4-8 4 8M7 10v8"/></svg>
+                <input type="color" id="textColorInput" value="#000000">
+              </label>
+              <label class="tb-color-label" title="Highlight color">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l4 8-4 8-4-8 4-8z"/></svg>
+                <input type="color" id="hiliteColorInput" value="#ffff00">
+              </label>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group">
+              <button class="tb-btn" id="alignLeftBtn" title="Align left">≡</button>
+              <button class="tb-btn" id="alignCenterBtn" title="Center">☰</button>
+              <button class="tb-btn" id="alignRightBtn" title="Align right">≡</button>
+              <button class="tb-btn" id="alignJustifyBtn" title="Justify">☷</button>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group">
+              <button class="tb-btn" id="olBtn" title="Numbered list">1.</button>
+              <button class="tb-btn" id="ulBtn" title="Bullet list">•</button>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group">
+              <button class="tb-btn" id="imageBtn" title="Insert image">🖼</button>
+              <button class="tb-btn" id="linkBtn" title="Insert link">🔗</button>
+              <button class="tb-btn" id="tableBtn" title="Insert table">⊞</button>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <div class="tb-group">
+              <button class="tb-btn" id="cleanBtn" title="Remove formatting">✕</button>
+            </div>
+
+            <div class="tb-divider"></div>
+
+            <button class="tb-btn tb-premium" id="docActionBtn" title="AI actions" style="font-size:.72rem">✨</button>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+          <div class="tb-divider"></div>
+
+          <div class="eh-zoom">
+            <button id="zoomOut" title="Zoom out">−</button>
+            <span id="zoomLevel">100%</span>
+            <button id="zoomIn" title="Zoom in">+</button>
+          </div>
+
+          <div class="tb-divider"></div>
+
+          <div class="export-wrap">
+            <button class="export-trigger" id="exportTrigger">
+              Export
+              <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+            </button>
+            <div class="export-menu" id="exportMenu">
+              <button class="em-item" data-fmt="pdf"><span class="em-label">Export PDF</span><span class="em-shortcut">⌘P</span></button>
+              <button class="em-item" data-fmt="docx"><span class="em-label">Export DOCX</span><span class="em-shortcut"></span></button>
+              <button class="em-item" data-fmt="html"><span class="em-label">Export HTML</span><span class="em-shortcut"></span></button>
+              <div class="em-divider"></div>
+              <button class="em-item" data-fmt="print"><span class="em-label">Print Document</span><span class="em-shortcut">⌘P</span></button>
+              <button class="em-item" data-fmt="copy-text"><span class="em-label">Copy as Text</span><span class="em-shortcut"></span></button>
+              <button class="em-item" data-fmt="copy-html"><span class="em-label">Copy as HTML</span><span class="em-shortcut"></span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="streamIndicator" class="stream-indicator hidden">
+        <span class="stream-dot"></span>
+        <span id="streamLabel">AI is generating your document…</span>
+      </div>
+
+      <div id="pageWrapper">
+        <div id="docPage" class="loaded" contenteditable="true">
+          <div id="skeleton" class="skeleton-doc">
+            <div class="sk-block w-40" style="height:22px;margin:30px auto;border-radius:4px"></div>
+            <div class="sk-block w-70" style="height:9px;margin:0 auto 20px;border-radius:4px"></div>
+            <div class="sk-block w-25" style="height:11px;margin:10px 0 6px;border-radius:4px"></div>
+            <div class="sk-block w-90" style="height:8px;margin:4px 0;border-radius:4px"></div>
+            <div class="sk-block w-75" style="height:8px;margin:4px 0;border-radius:4px"></div>
+            <div class="sk-block w-25" style="height:11px;margin:14px 0 6px;border-radius:4px"></div>
+            <div style="display:flex;justify-content:space-between;margin:4px 0"><div class="sk-block w-45" style="height:10px;border-radius:4px"></div><div class="sk-block w-20" style="height:10px;border-radius:4px"></div></div>
+            <div class="sk-block w-85" style="height:8px;margin:4px 0 4px 14px;border-radius:4px"></div>
+            <div class="sk-block w-70" style="height:8px;margin:4px 0 4px 14px;border-radius:4px"></div>
+            <div class="sk-block w-80" style="height:8px;margin:4px 0 4px 14px;border-radius:4px"></div>
+            <div style="display:flex;justify-content:space-between;margin:8px 0 4px"><div class="sk-block w-40" style="height:10px;border-radius:4px"></div><div class="sk-block w-20" style="height:10px;border-radius:4px"></div></div>
+            <div class="sk-block w-78" style="height:8px;margin:4px 0 4px 14px;border-radius:4px"></div>
+            <div class="sk-block w-65" style="height:8px;margin:4px 0 4px 14px;border-radius:4px"></div>
+            <div class="sk-block w-25" style="height:11px;margin:14px 0 6px;border-radius:4px"></div>
+            <div class="sk-block w-95" style="height:8px;margin:4px 0;border-radius:4px"></div>
+            <div class="sk-block w-88" style="height:8px;margin:4px 0;border-radius:4px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
