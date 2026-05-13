@@ -1,8 +1,9 @@
 (function(){
 "use strict";
 
-let sessionId=null,isLoading=false,docData=null,docType="resume",editorVisible=false;
+let sessionId=null,isLoading=false,docData=null,docType="generic",editorVisible=false;
 let uploadedText="",uploadedFilename="";
+let streamAbort=null;
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 
 // Landing elements
@@ -19,11 +20,41 @@ const backBtn=$("#backBtn"),backBtnEditor=$("#backBtnEditor"),newChatBtn=$("#new
 const editorDocType=$("#editorDocType"),zoomLevel=$("#zoomLevel");
 const wsFileInput=$("#wsFileInput"),wsFileInfo=$("#wsFileInfo"),wsFileName=$("#wsFileName"),wsClearFile=$("#wsClearFile");
 
-const socket=io();
-socket.on("connect",()=>{sessionId=socket.id});
-socket.on("session_id",d=>{sessionId=d.session_id});
+let socket=null;
+function initSocket(){
+  if(socket&&socket.connected)return socket;
+  socket=io({
+    reconnection:true,
+    reconnectionAttempts:5,
+    reconnectionDelay:1000,
+    reconnectionDelayMax:5000,
+  });
+  socket.on("connect",()=>{sessionId=socket.id});
+  socket.on("session_id",d=>{sessionId=d.session_id});
+  socket.on("disconnect",()=>{if(!isLoading)toast("Connection lost. Reconnecting...")});
+  socket.on("reconnect",()=>{toast("Reconnected.")});
+  return socket;
+}
+initSocket();
 
 let zoom=1;
+
+/* ─── DEBOUNCE ─── */
+function debounce(fn,wait){
+  let t;
+  return function(...args){
+    clearTimeout(t);
+    t=setTimeout(()=>fn.apply(this,args),wait);
+  };
+}
+
+/* ─── ABORT CONTROLLER ─── */
+function abortStream(){
+  if(streamAbort){
+    try{streamAbort.abort()}catch(e){}
+    streamAbort=null;
+  }
+}
 
 /* ─── HELPERS ─── */
 function esc(t){if(t==null)return '';const d=document.createElement("div");d.textContent=t;return d.innerHTML}
@@ -78,16 +109,71 @@ function showSuggestions(items){
   });
 }
 
-/* ─── DOCUMENT TYPE DETECTION ─── */
-const docPatterns={
-  resume:/resume|cv|curriculum\s*vitae|r[eé]sum[eé]/i,
-  cover_letter:/cover\s*letter|letter\s*of\s*(application|intent)/i,
-  proposal:/proposal|pitch|business\s*plan/i,
-  report:/report|project\s*report|status\s*report|findings/i,
-  invoice:/invoice|bill|statement\s*of\s*work/i,
-  email:/email|e-?mail|message|outreach/i,
+/* ─── INTELLIGENT DOCUMENT CLASSIFIER (universal) ─── */
+const docClassifiers={
+  /* PROFESSIONAL / CAREER */
+  resume:[
+    {w:12,k:["resume","cv","curriculum vitae","résumé"]},
+    {w:6,k:["ats","ats friendly"]},
+    {w:4,k:["job","career","hire","applicant","candidate","work history","professional summary","achievement"]},
+    {w:2,k:["experience","skills","education"]},
+  ],
+  cover_letter:[
+    {w:12,k:["cover letter","letter of intent","letter of application","recommendation letter","reference letter","experience letter","offer letter","relieving letter"]},
+    {w:6,k:["statement of purpose","personal statement","letter of recommendation"]},
+    {w:4,k:["dear hiring","dear manager","application for","sincerely","regards","i am writing to"]},
+  ],
+  /* BUSINESS */
+  proposal:[
+    {w:12,k:["proposal","business plan","project proposal","business proposal","sales proposal","partnership proposal","investor pitch"]},
+    {w:6,k:["scope of work","company profile","executive summary","pricing proposal"]},
+    {w:4,k:["budget","pitch","solution","deliverables","timeline","investment"]},
+  ],
+  report:[
+    {w:12,k:["report","project report","status report","research report","financial report","annual report","field report"]},
+    {w:6,k:["analysis","methodology","findings","executive summary","retrospective","risk assessment","project charter"]},
+    {w:4,k:["abstract","recommendations","conclusion","objectives","requirements specification","scope document"]},
+    {w:2,k:["meeting minutes","agenda"]},
+  ],
+  /* FINANCE */
+  invoice:[
+    {w:12,k:["invoice","bill","statement of work","quotation","estimate","purchase order"]},
+    {w:6,k:["expense report","budget proposal","financial statement"]},
+    {w:4,k:["payment terms","amount due","subtotal","itemized","total due","due date"]},
+    {w:2,k:["price","cost","payment"]},
+  ],
+  /* COMMUNICATION */
+  email:[
+    {w:12,k:["email","e-mail","email template"]},
+    {w:6,k:["follow-up","follow up","cold outreach","newsletter","outreach","press release","internal announcement","announcement"]},
+    {w:4,k:["formal letter","complaint letter","appreciation letter","cover note"]},
+    {w:2,k:["subject","to:","dear","regards"]},
+  ],
+  /* TECHNICAL / DOCUMENTATION */
+  documentation:[
+    {w:12,k:["documentation","technical documentation","user guide","user manual","api documentation","api doc","reference manual"]},
+    {w:8,k:["workflow","architecture","system design","design document","technical specification","technical spec","product requirements","prd","functional spec","software design","system architecture"]},
+    {w:6,k:["setup guide","installation guide","configuration guide","developer guide","knowledge base","release notes","troubleshooting guide"]},
+    {w:4,k:["sop","standard operating","how to","readme"]},
+    {w:2,k:["guide","handbook","wiki","technical writing"]},
+  ],
 };
-const docLabels={resume:"Resume",cover_letter:"Cover Letter",proposal:"Proposal",report:"Report",invoice:"Invoice",email:"Email"};
+
+/* Extended keyword mappings that route to generic (catches everything else) */
+const docGenericHints=[
+  {w:8,k:["nda","non-disclosure","non disclosure","confidentiality agreement","non compete"]},
+  {w:8,k:["contract","service agreement","legal agreement","terms of service","terms & conditions","terms and conditions","privacy policy","consent form","compliance"]},
+  {w:8,k:["marketing plan","marketing strategy","campaign brief","ad copy","landing page","social media content","content plan","product description"]},
+  {w:6,k:["business plan","business strategy","strategic plan","company overview","company profile","organizational chart"]},
+  {w:6,k:["memo","memorandum","policy document","policy","procedure"]},
+  {w:6,k:["project charter","scope document","timeline","roadmap","risk assessment"]},
+  {w:6,k:["meeting minutes","meeting agenda","action items","discussion notes"]},
+  {w:6,k:["assignment","thesis","dissertation","literature review","case study","whitepaper","white paper","abstract","research paper"]},
+  {w:6,k:["letter of","formal letter","official letter","business letter"]},
+  {w:4,k:["document","create a","generate","draft","write"]},
+];
+
+const docLabels={resume:"Resume",cover_letter:"Cover Letter",proposal:"Proposal",report:"Report",invoice:"Invoice",email:"Email",documentation:"Documentation",generic:"Document"};
 const docSuggestions={
   resume:["Improve bullet points","Make more ATS-friendly","Quantify achievements","Shorten to 1 page","Professional tone boost"],
   cover_letter:["Make more formal","Highlight key skills","Shorten","Add enthusiasm","Company-specific optimization"],
@@ -95,7 +181,42 @@ const docSuggestions={
   report:["Summarize findings","Improve clarity","Add recommendations","Generate citations"],
   invoice:["Add line items","Recalculate totals","Add payment terms","Convert currency"],
   email:["Make more professional","Shorten","Improve tone","Add call to action"],
+  documentation:["Add more sections","Improve clarity","Add examples","Format as reference","Restructure content"],
+  generic:["Improve structure","Polish writing","Add more detail","Format professionally","Add sections"],
 };
+
+function detectDocType(text){
+  const t=text.toLowerCase().trim();
+  if(!t)return"generic";
+  const scores={};
+  for(const [type,groups] of Object.entries(docClassifiers)){
+    let score=0;
+    for(const g of groups){
+      for(const kw of g.k){
+        if(t.includes(kw)){score+=g.w;break}
+      }
+    }
+    scores[type]=score;
+  }
+  /* Score generic hints separately */
+  let genericScore=0;
+  for(const g of docGenericHints){
+    for(const kw of g.k){
+      if(t.includes(kw)){genericScore+=g.w;break}
+    }
+  }
+  scores.generic=genericScore;
+
+  let best={type:"generic",score:0};
+  for(const [type,score] of Object.entries(scores)){
+    if(score>best.score){best={type,score}}
+  }
+
+  /* CONFIDENCE THRESHOLD: >=6 high, >=3 medium, <3 low */
+  if(best.score>=6)return best.type;
+  if(best.score>=3)return best.type;
+  return"generic";
+}
 
 /* ─── RECENT DOCS TRACKING ─── */
 function trackRecentDoc(type){
@@ -113,18 +234,6 @@ function renderRecentDocs(){
   if(!recent.length){list.innerHTML="";if(empty)empty.classList.remove("hidden");return}
   if(empty)empty.classList.add("hidden");
   list.innerHTML=recent.map(r=>`<div class="sb-recent-item" data-type="${r.type}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>${esc(r.label)}</span></div>`).join("");
-}
-
-function detectDocType(text){
-  for(const [type,pattern] of Object.entries(docPatterns)){
-    if(pattern.test(text)) return type;
-  }
-  // Fallback heuristic
-  if(/experience|skills|education|job/i.test(text)) return "resume";
-  if(/price|cost|payment|total|amount/i.test(text)) return "invoice";
-  if(/dear|sincerely|regards|application/i.test(text)) return "cover_letter";
-  if(/budget|solution|service/i.test(text)) return "proposal";
-  return "resume";
 }
 
 /* ─── LANDING TO WORKSPACE TRANSITION ─── */
@@ -252,11 +361,82 @@ function renderEmail(data){
   docPage.innerHTML=html;hideSkeleton();
 }
 
+/* ─── DOCUMENTATION RENDERER ─── */
+function renderDocumentation(data){
+  if(!data||typeof data!=='object'){showSkeleton();return}
+  docData=data;let html="<div class='doc-wrapper'>";
+  html+=`<div class="doc-title-page"><h1>${esc(data.title||"Documentation")}</h1>`;
+  if(data.author)html+=`<div class="doc-author">By: ${esc(data.author)}</div>`;
+  if(data.version)html+=`<div class="doc-version">Version: ${esc(data.version)}</div>`;
+  if(data.date)html+=`<div class="doc-date">${esc(data.date)}</div>`;
+  html+=`</div>`;
+  if(data.overview){html+=`<div class="doc-section"><h2>Overview</h2><p>${mdBold(esc(data.overview))}</p></div>`;}
+  if(data.sections&&data.sections.length){
+    data.sections.forEach((sec,i)=>{
+      html+=`<div class="doc-section"><h2>${esc(sec.heading||sec.title||"Section "+(i+1))}</h2>`;
+      if(sec.body)html+=`<p>${mdBold(esc(sec.body))}</p>`;
+      if(sec.content)html+=`<p>${mdBold(esc(sec.content))}</p>`;
+      if(sec.paragraphs&&sec.paragraphs.length){sec.paragraphs.forEach(p=>{html+=`<p>${mdBold(esc(p))}</p>`});}
+      if(sec.subsections&&sec.subsections.length){
+        sec.subsections.forEach(sub=>{
+          html+=`<h3>${esc(sub.heading||sub.title||"")}</h3>`;
+          if(sub.body)html+=`<p>${mdBold(esc(sub.body))}</p>`;
+          if(sub.content)html+=`<p>${mdBold(esc(sub.content))}</p>`;
+        });
+      }
+      if(sec.code){html+=`<pre><code>${esc(sec.code)}</code></pre>`;}
+      html+=`</div>`;
+    });
+  }
+  if(data.conclusion){html+=`<div class="doc-section"><h2>Conclusion</h2><p>${mdBold(esc(data.conclusion))}</p></div>`;}
+  html+="</div>";docPage.innerHTML=html;hideSkeleton();
+}
+
+/* ─── UNIVERSAL GENERIC DOCUMENT RENDERER ─── */
+function renderGeneric(data){
+  if(!data||typeof data!=='object'){showSkeleton();return}
+  docData=data;let html="<div class='gen-wrapper'>";
+  const docTypeLabel=data.document_type?" ("+esc(data.document_type)+")":"";
+  html+=`<div class="gen-title-page"><h1>${esc(data.title||"Document")}</h1>`;
+  if(data.document_type)html+=`<div class="gen-doctype-label">${esc(data.document_type)}</div>`;
+  if(data.author)html+=`<div class="gen-author">${esc(data.author)}</div>`;
+  if(data.date)html+=`<div class="gen-date">${esc(data.date)}</div>`;
+  html+=`</div>`;
+  if(data.summary){html+=`<div class="gen-section"><h2>Summary</h2><p>${mdBold(esc(data.summary))}</p></div>`;}
+  if(data.sections&&data.sections.length){
+    data.sections.forEach((sec,i)=>{
+      const heading=sec.heading||sec.title||"";
+      html+=`<div class="gen-section">`;
+      if(heading)html+=`<h2>${esc(heading)}</h2>`;
+      if(sec.body)html+=`<p>${mdBold(esc(sec.body))}</p>`;
+      if(sec.content)html+=`<p>${mdBold(esc(sec.content))}</p>`;
+      if(sec.paragraphs&&sec.paragraphs.length){sec.paragraphs.forEach(p=>{html+=`<p>${mdBold(esc(p))}</p>`});}
+      if(sec.items&&sec.items.length){html+=`<ul>${sec.items.map(it=>`<li>${esc(it)}</li>`).join("")}</ul>`;}
+      if(sec.subsections&&sec.subsections.length){
+        sec.subsections.forEach(sub=>{
+          html+=`<h3>${esc(sub.heading||sub.title||"")}</h3>`;
+          if(sub.body)html+=`<p>${mdBold(esc(sub.body))}</p>`;
+        });
+      }
+      html+=`</div>`;
+    });
+  }
+  if(data.content&&data.content.length){
+    let inSection=false;
+    data.content.forEach(item=>{
+      if(typeof item==="string"){html+=`<p>${mdBold(esc(item))}</p>`;}
+      else if(item.heading){html+=`<div class="gen-section"><h2>${esc(item.heading)}</h2>${item.body?`<p>${mdBold(esc(item.body))}</p>`:""}</div>`;}
+    });
+  }
+  if(data.conclusion){html+=`<div class="gen-section"><h2>Conclusion</h2><p>${mdBold(esc(data.conclusion))}</p></div>`;}
+  html+="</div>";docPage.innerHTML=html;hideSkeleton();
+}
+
 /* ─── FILE UPLOAD ─── */
 async function handleFileUpload(file,source){
   const fd=new FormData();fd.append("file",file);
   try{
-    const r=await fetch("/api/upload",{method:"POST",body:fd});
+    const r=await fetch("/api/upload",{method:"POST",body:fd,headers:{"X-Session-Id":sessionId||""}});
     const d=await r.json();
     if(d.error){toast(d.error);return}
     uploadedText=d.text;uploadedFilename=d.filename;
@@ -266,7 +446,10 @@ async function handleFileUpload(file,source){
       wsFileName.textContent=`📎 ${d.filename}`;wsFileInfo.classList.remove("hidden");
     }
     toast(`Loaded: ${d.filename}`);
-  }catch{toast("Upload failed.")}
+  }catch(e){
+    if(e.status===429){toast("Upload rate limit reached. Please wait.")}
+    else{toast("Upload failed.")}
+  }
 }
 
 landingFileInput.addEventListener("change",()=>{if(landingFileInput.files.length)handleFileUpload(landingFileInput.files[0],"landing")});
@@ -303,13 +486,24 @@ function afterGeneration(type){
 }
 
 async function generateDoc(text,type){
+  if(!text||!text.trim()){toast("Please provide a description.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
   showThink();showSkeleton();showStreamIndicator(type);
+  abortStream();
+  streamAbort=new AbortController();
+  const timeoutId=setTimeout(()=>{abortStream();toast("Generation timed out.");hideThink();hideStreamIndicator();rmLoad();isLoading=false;sendBtn.disabled=false},120000);
   try{
     const r=await fetch("/api/generate-stream",{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({prompt:text,doc_type:type,model:"deepseek-chat"})
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-Session-Id":sessionId||""},
+      body:JSON.stringify({prompt:text,doc_type:type,model:"deepseek-chat"}),
+      signal:streamAbort.signal,
     });
-    if(!r.ok||!r.body){hideThink();hideStreamIndicator();throw new Error("Stream not available")}
+    if(!r.ok){
+      hideThink();hideStreamIndicator();
+      if(r.status===429){toast("Rate limit reached. Please wait before generating again.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
+      throw new Error("Stream not available ("+r.status+")");
+    }
+    if(!r.body){hideThink();hideStreamIndicator();throw new Error("Stream body missing")}
     const reader=r.body.getReader();
     const dec=new TextDecoder();
     let buf="",full="";
@@ -324,43 +518,46 @@ async function generateDoc(text,type){
           const m=JSON.parse(p.slice(6));
           if(m.t){
             full+=m.t;
-            // Try to parse partial JSON and progressively render the document
-            try{const parsed=JSON.parse(full);const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail};if(rs[type]&&parsed&&typeof parsed==='object')rs[type](parsed)}catch(e){}
+            try{const parsed=JSON.parse(full);const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail,documentation:renderDocumentation,generic:renderGeneric};if(rs[type]&&parsed&&typeof parsed==='object')rs[type](parsed)}catch(e){}
           }
           else if(m.d){
-            hideThink();hideStreamIndicator();
-            const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail};
+            clearTimeout(timeoutId);hideThink();hideStreamIndicator();
+            const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail,documentation:renderDocumentation,generic:renderGeneric};
             if(rs[type]&&m.d&&typeof m.d==='object')rs[type](m.d);
-            else renderResume(m.d);
-            afterGeneration(type);return;
+            else renderGeneric(m.d);
+            afterGeneration(type);streamAbort=null;return;
           }else if(m.e){
-            hideThink();hideStreamIndicator();toast(m.e);rmLoad();isLoading=false;sendBtn.disabled=false;return;
+            clearTimeout(timeoutId);hideThink();hideStreamIndicator();toast(m.e||"Generation error.");rmLoad();isLoading=false;sendBtn.disabled=false;streamAbort=null;return;
           }
         }catch(e){/* skip parse errors */}
       }
     }
-    // Fallback: try parsing full accumulated text
+    clearTimeout(timeoutId);
     hideThink();hideStreamIndicator();
-    const jm=full.match(/\{.*\}/s);
-    if(jm){const d=JSON.parse(jm[0]);const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail};if(rs[type]&&d&&typeof d==='object')rs[type](d);else renderResume(d);afterGeneration(type)}
-    else{toast("Could not parse AI response.");rmLoad();isLoading=false;sendBtn.disabled=false}
+    if(full.trim()){
+      const jm=full.match(/\{.*\}/s);
+      if(jm){try{const d=JSON.parse(jm[0]);const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail,documentation:renderDocumentation,generic:renderGeneric};if(rs[type]&&d&&typeof d==='object')rs[type](d);else renderGeneric(d);afterGeneration(type)}catch(e){toast("Could not parse AI response.");rmLoad();isLoading=false;sendBtn.disabled=false}}
+      else{toast("Could not parse AI response.");rmLoad();isLoading=false;sendBtn.disabled=false}
+    }else{toast("No response from AI.");rmLoad();isLoading=false;sendBtn.disabled=false}
   }catch(e){
+    clearTimeout(timeoutId);
     hideThink();hideStreamIndicator();
-    // Fallback to non-streaming endpoint
+    if(e.name==="AbortError"){toast("Generation cancelled.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
     try{
       const r=await fetch("/api/generate-resume",{
-        method:"POST",headers:{"Content-Type":"application/json"},
+        method:"POST",headers:{"Content-Type":"application/json","X-Session-Id":sessionId||""},
         body:JSON.stringify({prompt:text,doc_type:type,model:"deepseek-chat"})
       });
       const d=await r.json();hideThink();
       if(d.error){toast(d.error||"Generation issue.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
       if(!d.resume){toast("Could not parse AI response.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
-      const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail};
+      const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail,documentation:renderDocumentation,generic:renderGeneric};
       if(rs[type]&&d.resume&&typeof d.resume==='object')rs[type](d.resume);
-      else renderResume(d.resume);
+      else renderGeneric(d.resume);
       afterGeneration(type);
-    }catch(e2){hideThink();toast("Generation failed."+e2.message);rmLoad();isLoading=false;sendBtn.disabled=false}
+    }catch(e2){hideThink();toast("Generation failed. Please try again.");rmLoad();isLoading=false;sendBtn.disabled=false}
   }
+  streamAbort=null;
 }
 
 /* ─── LANDING SEND ─── */
@@ -384,6 +581,9 @@ function doLandingSend(){
     setTimeout(()=>{generateDoc(fullPrompt,type)},400);
   },800);
 }
+
+const debouncedLandingSend=debounce(doLandingSend,300);
+const debouncedSend=debounce(send,300);
 
 /* ─── WORKSPACE SEND ─── */
 function send(){
@@ -439,6 +639,7 @@ async function fetchCSS(){
   try{const r=await fetch("/static/css/style.css");return await r.text()}catch{return""}
 }
 async function doExport(fmt){
+  if(isLoading){toast("Please wait for generation to complete.");return}
   const content=cleanDocHTML();
   if(!content||content.trim()===''||content.includes('skeleton')){toast("No document content to export.");return}
   const label=docLabels[docType]||"document";
@@ -462,7 +663,7 @@ async function doExport(fmt){
     const fullCSS=css+' '+fix;
 
     if(fmt==="html"){
-      const h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+label+'</title><style>'+fullCSS+'</style></head><body><div id="docPage">'+content+'</div></body></html>';
+      const h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+label.replace(/[<>&"]/g,'')+'</title><style>'+fullCSS+'</style></head><body><div id="docPage">'+content+'</div></body></html>';
       triggerDownload(new Blob([h],{type:"text/html"}),label+".html");
       toast("HTML exported!");return;
     }
@@ -471,13 +672,18 @@ async function doExport(fmt){
       if(typeof html2pdf==="undefined"){toast("PDF library not loaded.");hideExporting();return}
       const prevOverflow=docPage.style.overflow;
       docPage.style.overflow="visible";
-      await html2pdf().set({
-        margin:[0,0,0,0],filename:label+".pdf",
-        image:{type:"jpeg",quality:0.98},
-        html2canvas:{scale:2,useCORS:true,logging:false,letterRendering:true},
-        jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
-        pagebreak:{mode:["avoid-all","css","legacy"]}
-      }).from(docPage).save();
+      try{
+        await html2pdf().set({
+          margin:[0,0,0,0],filename:label+".pdf",
+          image:{type:"jpeg",quality:0.98},
+          html2canvas:{scale:2,useCORS:true,logging:false,letterRendering:true},
+          jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
+          pagebreak:{mode:["avoid-all","css","legacy"]}
+        }).from(docPage).save();
+      }catch(pdfErr){
+        docPage.style.overflow=prevOverflow;
+        throw pdfErr;
+      }
       docPage.style.overflow=prevOverflow;
       toast("PDF exported!");return;
     }
@@ -487,7 +693,7 @@ async function doExport(fmt){
       triggerDownload(new Blob([h],{type:"application/msword"}),label+".docx");
       toast("DOCX downloaded!");return;
     }
-  }catch(exc){toast("Export failed: "+exc.message)}
+  }catch(exc){toast("Export failed. Please try again.")}
   finally{hideExporting()}
 }
 
@@ -503,17 +709,11 @@ function autoResize(el,max){
   if(h>=m)el.style.overflowY="auto";
 }
 landingInput.addEventListener("input",function(){autoResize(this);landingSend.disabled=!this.value.trim()});
-landingInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();doLandingSend()}});
-landingSend.addEventListener("click",doLandingSend);
+landingInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();if(!isLoading)debouncedLandingSend()}});
+landingSend.addEventListener("click",function(){if(!isLoading)debouncedLandingSend()});
 // Template card clicks
 $$(".lp-card[data-prompt]").forEach(card=>{
-  card.addEventListener("click",()=>{landingInput.value=card.dataset.prompt;autoResize(landingInput);doLandingSend()});
-});
-// Blank card
-document.querySelector(".lp-card-blank")?.addEventListener("click",()=>{
-  landingInput.value="Create a blank document with placeholder content";
-  autoResize(landingInput);
-  doLandingSend();
+  card.addEventListener("click",()=>{if(isLoading)return;landingInput.value=card.dataset.prompt;autoResize(landingInput);debouncedLandingSend()});
 });
 // Category filter pills
 $$(".lp-cat").forEach(btn=>{
@@ -524,10 +724,7 @@ $$(".lp-cat").forEach(btn=>{
     $$(".lp-card").forEach(card=>{
       const type=card.dataset.type||"";
       if(cat==="all"||!cat){card.style.display="";return}
-      if(cat==="blank"&&type==="blank"){card.style.display="";return}
-      if(type===cat){card.style.display="";return}
-      // Show blank + upload always
-      if(type==="blank"||card.id==="landingUploadCard"){card.style.display="";return}
+      if(card.id==="landingUploadCard"){card.style.display="";return}
       card.style.display="none";
     });
     // Animate visible cards
@@ -536,11 +733,14 @@ $$(".lp-cat").forEach(btn=>{
 });
 
 // Workspace
-chatInput.addEventListener("input",function(){autoResize(this,80);sendBtn.disabled=!this.value.trim()});
-chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});
+chatInput.addEventListener("input",function(){autoResize(this,80);sendBtn.disabled=!this.value.trim()||isLoading});
+chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();if(!isLoading)debouncedSend()}});
+sendBtn.addEventListener("click",function(){if(!isLoading)debouncedSend()});
 
 // Back to landing
 function goToLanding(){
+  abortStream();
+  if(isLoading){rmLoad();isLoading=false;sendBtn.disabled=false}
   workspace.classList.add("hidden");workspace.classList.remove("show");
   landingPage.classList.remove("hidden");
   landingPage.style.opacity="";landingPage.style.transform="";

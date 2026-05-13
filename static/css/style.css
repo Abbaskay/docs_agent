@@ -59,6 +59,7 @@ body{
 #landingPage{
   position:fixed;inset:0;
   display:flex;flex-direction:column;
+  justify-content:center;
   z-index:10;
   background:var(--bg);
   transition:opacity 0.6s var(--ease-out),transform 0.6s var(--ease-out);
@@ -67,23 +68,23 @@ body{
 
 .lp-topnav{
   display:flex;align-items:center;justify-content:center;
-  padding:32px 32px 0;flex-shrink:0;
+  flex-shrink:0;
 }
 .lp-topnav-logo{
   display:flex;align-items:center;gap:12px;
-  font-size:1.05rem;font-weight:700;color:var(--text);
-  letter-spacing:-0.01em;
+  font-size:3.2rem;font-weight:700;color:var(--text);
+  letter-spacing:-0.03em;
 }
-.lp-topnav-logo svg{flex-shrink:0;width:24px;height:24px;stroke:var(--accent)}
+.lp-topnav-logo svg{flex-shrink:0;width:38px;height:38px;stroke:var(--accent)}
 
 .lp-main{
-  flex:1;display:flex;flex-direction:column;
+  flex:none;display:flex;flex-direction:column;
   overflow-y:auto;padding:0 48px 24px;
 }
 
 .lp-topbar{
-  flex:1;display:flex;justify-content:center;align-items:center;
-  padding:0;min-height:120px;
+  flex:none;display:flex;justify-content:center;align-items:center;
+  padding:8px 0 0;margin-bottom:20px;
 }
 .lp-prompt-wrapper{flex:0 1 680px;width:100%}
 .lp-prompt{
@@ -127,7 +128,7 @@ body{
 /* Category pills */
 .lp-categories{
   display:flex;justify-content:center;gap:8px;
-  padding:4px 0 24px;flex-shrink:0;
+  padding:0 0 12px;flex-shrink:0;
   overflow-x:auto;scrollbar-width:none;
 }
 .lp-categories::-webkit-scrollbar{display:none}
@@ -158,11 +159,12 @@ body{
 /* Template grid */
 .lp-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
-  gap:18px;
+  grid-template-columns:repeat(4,1fr);
+  gap:14px;
   flex-shrink:0;
-  max-width:1200px;width:100%;margin:0 auto 32px;
+  max-width:920px;width:100%;margin:0 auto 12px;
   animation:gridIn 0.5s var(--ease-out);
+  justify-content:center;
 }
 @keyframes gridIn{
   from{opacity:0;transform:translateY(16px)}
@@ -193,21 +195,6 @@ body{
   box-shadow:var(--shadow-lg),var(--shadow-glow);
 }
 .lp-card:hover::after{opacity:1}
-
-.lp-card-blank{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  min-height:230px;
-  border-style:dashed;
-  border-color:var(--border2);
-  background:var(--bg2);
-}
-.lp-card-blank:hover{border-style:solid;border-color:var(--accent)}
-.lpc-blank-icon{
-  font-size:2rem;color:var(--text3);margin-bottom:6px;
-  transition:color 0.2s var(--ease);
-  font-family:var(--font-display);font-weight:300;
-}
-.lp-card-blank:hover .lpc-blank-icon{color:var(--accent)}
 
 .lpc-thumb{
   padding:18px 20px 14px;height:165px;
@@ -796,6 +783,37 @@ body{
 #docPage .email-sig-block{margin-top:14px;padding-top:10px;border-top:1px solid #f0f0f2}
 #docPage .email-sig-block .email-sig-name{font-size:10.5pt;font-weight:700;color:#1d1d1f}
 #docPage .email-sig-block .email-sig-detail{font-size:8.5pt;color:#6e6e73;margin-top:1px}
+
+/* ─── DOCUMENTATION ─── */
+#docPage .doc-wrapper{max-width:510px;margin:0 auto;font-family:Calibri,'Segoe UI',Arial,sans-serif}
+#docPage .doc-title-page{margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #1d1d1f}
+#docPage .doc-title-page h1{font-size:22pt;font-weight:700;color:#1d1d1f;letter-spacing:-0.02em;margin-bottom:2px}
+#docPage .doc-author,#docPage .doc-version{font-size:9pt;color:#8e8e93;display:inline;margin-right:12px}
+#docPage .doc-date{font-size:9pt;color:#aeaeb2}
+#docPage .doc-section{margin:8px 0 5px}
+#docPage .doc-section h2{font-size:12pt;font-weight:700;color:#1d1d1f;border-bottom:1px solid #e8e8ed;padding-bottom:2px;margin-bottom:5px;margin-top:10px}
+#docPage .doc-section h3{font-size:10.5pt;font-weight:600;color:#3a3a3c;margin:5px 0 2px;padding-left:12px;border-left:2px solid #d2d2d6}
+#docPage .doc-section p{margin-bottom:4px;font-size:9.5pt;line-height:1.45;color:#3a3a3c}
+#docPage .doc-section pre{background:#f5f5f7;border:1px solid #e8e8ed;border-radius:6px;padding:10px 14px;margin:6px 0;overflow-x:auto;font-size:8.5pt;color:#1d1d1f;font-family:'SF Mono','Courier New',monospace;line-height:1.4}
+#docPage .doc-section code{font-size:8.5pt;background:#f5f5f7;padding:1px 4px;border-radius:2px;font-family:'SF Mono','Courier New',monospace}
+
+/* ─── GENERIC ─── */
+#docPage .gen-wrapper{max-width:510px;margin:0 auto;font-family:Calibri,'Segoe UI',Arial,sans-serif}
+#docPage .gen-title-page{margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e8e8ed}
+#docPage .gen-title-page h1{font-size:20pt;font-weight:700;color:#1d1d1f;letter-spacing:-0.02em;margin-bottom:1px}
+#docPage .gen-author{font-size:9.5pt;color:#6e6e73;margin-bottom:2px}
+#docPage .gen-date{font-size:8.5pt;color:#aeaeb2}
+#docPage .gen-doctype-label{font-size:8pt;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--accent,#14b8a6);margin-bottom:4px}
+#docPage .gen-section{margin:8px 0 5px}
+#docPage .gen-section h2{font-size:11pt;font-weight:700;color:#1d1d1f;margin-bottom:4px;margin-top:8px}
+#docPage .gen-section p{margin-bottom:4px;font-size:9.5pt;line-height:1.45;color:#3a3a3c}
+#docPage .gen-section ul{margin:3px 0;padding-left:18px;list-style:none}
+#docPage .gen-section ul li{font-size:9.5pt;line-height:1.35;margin-bottom:1.5px;position:relative;padding-left:6px}
+#docPage .gen-section ul li::before{content:"–";position:absolute;left:-8px;color:#aeaeb2}
+
+/* ─── DOCUMENTATION THUMB ─── */
+.lpc-thumb-doc{background:linear-gradient(135deg,#eef0f5,#e4e6ed)}
+.lpc-thumb-doc .lpt-head{font-size:5.5pt;margin-bottom:2px;color:#636366}
 
 /* ─── SKELETON ─── */
 #docPage:not(.loaded) .skeleton-doc{display:block}

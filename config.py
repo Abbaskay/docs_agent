@@ -345,3 +345,22 @@ def register() -> None:
 
 # Auto-register on import
 register()
+
+# ---------------------------------------------------------------------------
+# Validate required environment variables at startup
+# ---------------------------------------------------------------------------
+
+import os as _os
+
+
+def _check_env(name: str, required: bool = True) -> str | None:
+    value = _os.getenv(name)
+    if required and not value:
+        raise RuntimeError(
+            f"Missing required environment variable: {name}. "
+            f"Copy .env.example to .env and set {name}."
+        )
+    return value
+
+
+_check_env("DEEPSEEK_API_KEY")

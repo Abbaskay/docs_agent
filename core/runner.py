@@ -36,6 +36,9 @@ def _failure_response(answer: str, iterations: int) -> dict:
     }
 
 
+AGENT_TIMEOUT_SECONDS = int(os.getenv("AGENT_TIMEOUT_SECONDS", "120"))
+
+
 def run_agent(
     task: str,
     config: AgentConfig,
@@ -60,6 +63,8 @@ def run_agent(
             tool_call_count: int  — total tools executed
             success:         bool — True if completed, False if max iterations hit
     """
+
+    start_time = time.time()
 
     api_key = os.getenv("DEEPSEEK_API_KEY")
     if not api_key:
@@ -104,6 +109,13 @@ def run_agent(
     # Step 6: Enter the agentic loop
     while iterations < config.max_iterations:
         iterations += 1
+
+        # Check global timeout
+        if time.time() - start_time > AGENT_TIMEOUT_SECONDS:
+            return _failure_response(
+                "The agent took too long to respond. Please try a simpler request.",
+                iterations,
+            )
 
         # Trim message history if it grows too large (before building the request)
         if len(memory.messages) > 40:

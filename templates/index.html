@@ -39,15 +39,10 @@
       <button class="lp-cat">Report</button>
       <button class="lp-cat">Invoice</button>
       <button class="lp-cat">Email</button>
+      <button class="lp-cat">Documentation</button>
     </div>
 
     <div class="lp-grid" id="templateGrid">
-      <div class="lp-card lp-card-blank" data-type="blank">
-        <div class="lpc-blank-icon">+</div>
-        <div class="lpc-label">Blank Document</div>
-        <div class="lpc-desc">Start from scratch with AI</div>
-      </div>
-
       <div class="lp-card" data-type="resume" data-prompt="Create a professional resume with strong achievement-based bullet points. Name: Alex Chen. Role: Software Engineer. 4 years experience in React, Node.js, TypeScript.">
         <div class="lpc-thumb lpc-thumb-resume">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:18px;height:18px;border-radius:50%;background:#c4c4c8"></div><div><div class="lpt-name" style="margin:0">Alex Chen</div><div style="font-size:5pt;color:#8e8e93">Software Engineer</div></div></div>
@@ -142,6 +137,23 @@
         </div>
         <div class="lpc-label">Email Template</div>
         <div class="lpc-desc">AI-crafted messaging</div>
+      </div>
+
+      <div class="lp-card" data-type="documentation" data-prompt="Create documentation for a software system. Title: User Authentication Service. Include sections: Overview, Architecture, API Endpoints, Configuration, Deployment.">
+        <div class="lpc-thumb lpc-thumb-doc">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:14px;height:14px;border-radius:2px;background:#aeaeb2;font-size:6pt;display:flex;align-items:center;justify-content:center;color:#fff">¶</div><div><div class="lpt-name" style="margin:0;font-size:6pt">Technical Docs</div></div></div>
+          <div class="lpt-sep"></div>
+          <div class="lpt-head">Overview</div>
+          <div class="lpt-line lpt-w90"></div>
+          <div class="lpt-line lpt-w80"></div>
+          <div class="lpt-head">API Endpoints</div>
+          <div class="lpt-line lpt-w65"></div>
+          <div class="lpt-line lpt-w75"></div>
+          <div class="lpt-head">Configuration</div>
+          <div style="display:flex;gap:4px"><div class="lpt-line lpt-w40"></div><div class="lpt-line lpt-w55"></div></div>
+        </div>
+        <div class="lpc-label">Documentation</div>
+        <div class="lpc-desc">Technical &amp; workflow docs</div>
       </div>
 
       <div class="lp-card lp-card-upload" id="landingUploadCard">
