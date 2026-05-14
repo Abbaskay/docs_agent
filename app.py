@@ -89,14 +89,14 @@ CORS(
 socketio = SocketIO(
     app,
     cors_allowed_origins=ALLOWED_ORIGINS.split(","),
-    async_mode="threading",
+    async_mode=None,
     ping_timeout=int(os.getenv("SOCKET_PING_TIMEOUT", "60")),
     ping_interval=int(os.getenv("SOCKET_PING_INTERVAL", "25")),
 )
 
 db = init_db(app)
 
-MAX_DOCUMENT_CHARS = int(os.getenv("MAX_DOCUMENT_CHARS", "50000"))
+MAX_DOCUMENT_CHARS = int(os.getenv("MAX_DOCUMENT_CHARS", "100000"))
 DEFAULT_FILENAME = "my_document.txt"
 FONT_DIR = Path(__file__).resolve().parent / "fonts"
 

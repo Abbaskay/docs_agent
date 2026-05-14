@@ -16,7 +16,7 @@ const workspace=$("#workspace"),chatMessages=$("#chatMessages"),chatInput=$("#ch
 const sendBtn=$(".send-btn"),thinkingPanel=$(".thinking-panel"),suggestions=$("#suggestions");
 const docPage=$("#docPage"),pageWrapper=$("#pageWrapper");
 const exportMenu=$("#exportMenu"),editorPanel=$("#editorPanel"),docTypeBadge=$("#docTypeBadge");
-const backBtn=$("#backBtn"),backBtnEditor=$("#backBtnEditor"),newChatBtn=$("#newChatBtn"),toastEl=$("#toast");
+const backBtn=$("#backBtn"),backBtnEditor=$("#backBtnEditor"),toastEl=$("#toast");
 const editorDocType=$("#editorDocType"),zoomLevel=$("#zoomLevel");
 const wsFileInput=$("#wsFileInput"),wsFileInfo=$("#wsFileInfo"),wsFileName=$("#wsFileName"),wsClearFile=$("#wsClearFile");
 
@@ -31,8 +31,8 @@ function initSocket(){
   });
   socket.on("connect",()=>{sessionId=socket.id});
   socket.on("session_id",d=>{sessionId=d.session_id});
-  socket.on("disconnect",()=>{if(!isLoading)toast("Connection lost. Reconnecting...")});
-  socket.on("reconnect",()=>{toast("Reconnected.")});
+  socket.on("disconnect",()=>{if(!isLoading)toast("Connection lost. Reconnecting...","warning")});
+  socket.on("reconnect",()=>{toast("Reconnected.","success")});
   return socket;
 }
 initSocket();
@@ -58,26 +58,30 @@ function abortStream(){
 
 /* ─── HELPERS ─── */
 function esc(t){if(t==null)return '';const d=document.createElement("div");d.textContent=t;return d.innerHTML}
-function toast(m){
+function toast(m,type){
   toastEl.textContent=m;
+  toastEl.className="toast"+(type?" toast-"+type:"");
   toastEl.classList.remove("hidden");
-  toastEl.style.transition="none";toastEl.style.opacity="0";toastEl.style.transform="translateX(-50%) translateY(16px) scale(0.95)";
+  toastEl.style.transition="none";
+  toastEl.style.opacity="0";
+  toastEl.style.transform="translateX(-50%) translateY(16px) scale(0.95)";
   requestAnimationFrame(()=>{
     toastEl.style.transition="";
-    toastEl.style.opacity="";toastEl.style.transform="";
+    toastEl.style.opacity="";
+    toastEl.style.transform="";
   });
   clearTimeout(toastEl._t);
   toastEl._t=setTimeout(()=>toastEl.classList.add("hidden"),2800);
 }
 function addMsg(role,content){
   const div=document.createElement("div");div.className=`msg ${role}`;
-  const av=role==="user"?`<div class="msg-avatar user">👤</div>`:`<div class="msg-avatar agent">🤖</div>`;
-  div.innerHTML=av+`<div class="msg-body"><div class="msg-bubble">${esc(content)}</div></div>`;
+  const av=role==="user"?'<div class="msg-avatar user"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>':'<div class="msg-avatar agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>';
+  div.innerHTML=av+'<div class="msg-body"><div class="msg-bubble">'+esc(content)+"</div></div>";
   chatMessages.appendChild(div);chatMessages.scrollTop=chatMessages.scrollHeight;
 }
 function addLoad(){
   const d=document.createElement("div");d.className="msg agent";d.id="loadMsg";
-  d.innerHTML=`<div class="msg-avatar agent">🤖</div><div class="msg-body"><div class="msg-bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div></div>`;
+  d.innerHTML='<div class="msg-avatar agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div class="msg-body"><div class="msg-bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div></div>';
   chatMessages.appendChild(d);chatMessages.scrollTop=chatMessages.scrollHeight;
 }
 function rmLoad(){const e=document.getElementById("loadMsg");if(e)e.remove()}
@@ -90,7 +94,7 @@ function applyZoom(){pageWrapper.style.transform=`scale(${zoom})`;zoomLevel.text
 
 function showSkeleton(){
   const sk=document.querySelector("#skeleton");
-  docPage.innerHTML=sk&&sk.innerHTML?'<div class="skeleton-doc">'+sk.innerHTML+'</div>':'<div class="skeleton-doc"><div class="sk-block w-40" style="height:22px;margin:30px auto"></div><div class="sk-block w-70" style="height:9px;margin:0 auto 20px"></div><div class="sk-block w-25" style="height:11px;margin:10px 0 6px"></div><div class="sk-block w-90" style="height:8px;margin:4px 0"></div><div class="sk-block w-75" style="height:8px;margin:4px 0"></div><div class="sk-block w-25" style="height:11px;margin:14px 0 6px"></div><div class="sk-block w-95" style="height:8px;margin:4px 0"></div></div>';
+  docPage.innerHTML=sk&&sk.innerHTML?'<div class="skeleton-doc">'+sk.innerHTML+'</div>':'<div class="skeleton-doc"><div class="sk-block w-40" style="height:20px;margin:30px auto"></div><div class="sk-block w-70" style="height:8px;margin:0 auto 18px"></div><div class="sk-block w-25" style="height:10px;margin:10px 0 5px"></div><div class="sk-block w-90" style="height:7px;margin:3px 0"></div><div class="sk-block w-75" style="height:7px;margin:3px 0"></div><div class="sk-block w-25" style="height:10px;margin:14px 0 5px"></div><div class="sk-block w-95" style="height:7px;margin:3px 0"></div></div>';
   docPage.classList.remove("loaded");editorPanel.classList.add("generating");
 }
 function hideSkeleton(){
@@ -226,15 +230,6 @@ function trackRecentDoc(type){
   filtered.unshift({type,label,timestamp:Date.now()});
   localStorage.setItem("da_recent",JSON.stringify(filtered.slice(0,10)));
 }
-function renderRecentDocs(){
-  const panel=document.getElementById("sbRecentPanel"),list=document.getElementById("sbRecentList");
-  if(!panel||!list)return;
-  const recent=JSON.parse(localStorage.getItem("da_recent")||"[]");
-  const empty=panel.querySelector(".sb-recent-empty");
-  if(!recent.length){list.innerHTML="";if(empty)empty.classList.remove("hidden");return}
-  if(empty)empty.classList.add("hidden");
-  list.innerHTML=recent.map(r=>`<div class="sb-recent-item" data-type="${r.type}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>${esc(r.label)}</span></div>`).join("");
-}
 
 /* ─── LANDING TO WORKSPACE TRANSITION ─── */
 function revealWorkspace(type){
@@ -245,7 +240,7 @@ function revealWorkspace(type){
   landingPage.classList.add("hidden");
   workspace.classList.remove("hidden");
   workspace.classList.add("show");
-  addMsg("assistant",`I'll create a **${label}** for you. Let me generate that now.`);
+  addMsg("assistant","I'll create a **"+label+"** for you. Let me generate that now.");
   setTimeout(()=>{if(chatInput)chatInput.focus()},600);
 }
 
@@ -318,7 +313,6 @@ function renderReport(data){
   html+=`</ol></div>`;
   sectionKeys.forEach(([key,label]) =>{
     if(data[key]){
-      const num=label.split(".")[0];
       html+=`<div class="rpt-section"><h2>${label}</h2><p>${mdBold(esc(data[key]))}</p></div>`;
     }
   });
@@ -396,7 +390,6 @@ function renderDocumentation(data){
 function renderGeneric(data){
   if(!data||typeof data!=='object'){showSkeleton();return}
   docData=data;let html="<div class='gen-wrapper'>";
-  const docTypeLabel=data.document_type?" ("+esc(data.document_type)+")":"";
   html+=`<div class="gen-title-page"><h1>${esc(data.title||"Document")}</h1>`;
   if(data.document_type)html+=`<div class="gen-doctype-label">${esc(data.document_type)}</div>`;
   if(data.author)html+=`<div class="gen-author">${esc(data.author)}</div>`;
@@ -422,7 +415,6 @@ function renderGeneric(data){
     });
   }
   if(data.content&&data.content.length){
-    let inSection=false;
     data.content.forEach(item=>{
       if(typeof item==="string"){html+=`<p>${mdBold(esc(item))}</p>`;}
       else if(item.heading){html+=`<div class="gen-section"><h2>${esc(item.heading)}</h2>${item.body?`<p>${mdBold(esc(item.body))}</p>`:""}</div>`;}
@@ -438,17 +430,17 @@ async function handleFileUpload(file,source){
   try{
     const r=await fetch("/api/upload",{method:"POST",body:fd,headers:{"X-Session-Id":sessionId||""}});
     const d=await r.json();
-    if(d.error){toast(d.error);return}
+    if(d.error){toast(d.error,"error");return}
     uploadedText=d.text;uploadedFilename=d.filename;
     if(source==="landing"){
-      landingFileName.textContent=`📎 ${d.filename}`;landingFileInfo.classList.remove("hidden");
+      landingFileName.textContent="📎 "+d.filename;landingFileInfo.classList.remove("hidden");
     }else{
-      wsFileName.textContent=`📎 ${d.filename}`;wsFileInfo.classList.remove("hidden");
+      wsFileName.textContent="📎 "+d.filename;wsFileInfo.classList.remove("hidden");
     }
-    toast(`Loaded: ${d.filename}`);
+    toast("Loaded: "+d.filename,"success");
   }catch(e){
-    if(e.status===429){toast("Upload rate limit reached. Please wait.")}
-    else{toast("Upload failed.")}
+    if(e.status===429){toast("Upload rate limit reached. Please wait.","warning")}
+    else{toast("Upload failed.","error")}
   }
 }
 
@@ -456,7 +448,7 @@ landingFileInput.addEventListener("change",()=>{if(landingFileInput.files.length
 landingUploadCard.addEventListener("click",(e)=>{if(e.target.closest('.uz-clear'))return;landingFileInput.click()});
 landingClearFile.addEventListener("click",(e)=>{e.stopPropagation();uploadedText="";uploadedFilename="";landingFileInfo.classList.add("hidden");landingFileInput.value=""});
 // Drag-drop on card
-landingUploadCard.addEventListener("dragover",e=>{e.preventDefault();landingUploadCard.style.borderColor="var(--accent)";landingUploadCard.style.background="var(--accent-glow)"});
+landingUploadCard.addEventListener("dragover",e=>{e.preventDefault();landingUploadCard.style.borderColor="var(--accent)";landingUploadCard.style.background="rgba(20,184,166,0.05)"});
 landingUploadCard.addEventListener("dragleave",()=>{landingUploadCard.style.borderColor="";landingUploadCard.style.background=""});
 landingUploadCard.addEventListener("drop",e=>{e.preventDefault();landingUploadCard.style.borderColor="";landingUploadCard.style.background="";if(e.dataTransfer.files.length)handleFileUpload(e.dataTransfer.files[0],"landing")});
 wsFileInput.addEventListener("change",()=>{if(wsFileInput.files.length)handleFileUpload(wsFileInput.files[0],"workspace")});
@@ -469,7 +461,7 @@ function showStreamIndicator(type){
   const el=document.getElementById("streamIndicator");
   const label=document.getElementById("streamLabel");
   if(el)el.classList.remove("hidden");
-  if(label)label.textContent=`AI is generating your ${docLabels[type]||"document"}...`;
+  if(label)label.textContent="AI is generating your "+(docLabels[type]||"document")+"…";
 }
 function hideStreamIndicator(){
   const el=document.getElementById("streamIndicator");
@@ -479,18 +471,17 @@ function afterGeneration(type){
   const sug=docSuggestions[type]||["Improve","Polish","Export"];
   showSuggestions(sug);
   rmLoad();isLoading=false;suggestions.classList.remove("hidden");
-  addMsg("assistant",`Your **${docLabels[type]}** is ready! Edit directly in the preview or use suggestions below.`);
   sendBtn.disabled=false;chatInput.focus();
-  toast(`${docLabels[type]} generated!`);
+  toast((docLabels[type]||"Document")+" generated!","success");
   trackRecentDoc(type);
 }
 
 async function generateDoc(text,type){
-  if(!text||!text.trim()){toast("Please provide a description.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
+  if(!text||!text.trim()){toast("Please provide a description.","warning");rmLoad();isLoading=false;sendBtn.disabled=false;return}
   showThink();showSkeleton();showStreamIndicator(type);
   abortStream();
   streamAbort=new AbortController();
-  const timeoutId=setTimeout(()=>{abortStream();toast("Generation timed out.");hideThink();hideStreamIndicator();rmLoad();isLoading=false;sendBtn.disabled=false},120000);
+  const timeoutId=setTimeout(()=>{abortStream();toast("Generation timed out.","error");hideThink();hideStreamIndicator();rmLoad();isLoading=false;sendBtn.disabled=false},120000);
   try{
     const r=await fetch("/api/generate-stream",{
       method:"POST",
@@ -500,7 +491,7 @@ async function generateDoc(text,type){
     });
     if(!r.ok){
       hideThink();hideStreamIndicator();
-      if(r.status===429){toast("Rate limit reached. Please wait before generating again.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
+      if(r.status===429){toast("Rate limit reached. Please wait.","warning");rmLoad();isLoading=false;sendBtn.disabled=false;return}
       throw new Error("Stream not available ("+r.status+")");
     }
     if(!r.body){hideThink();hideStreamIndicator();throw new Error("Stream body missing")}
@@ -527,7 +518,7 @@ async function generateDoc(text,type){
             else renderGeneric(m.d);
             afterGeneration(type);streamAbort=null;return;
           }else if(m.e){
-            clearTimeout(timeoutId);hideThink();hideStreamIndicator();toast(m.e||"Generation error.");rmLoad();isLoading=false;sendBtn.disabled=false;streamAbort=null;return;
+            clearTimeout(timeoutId);hideThink();hideStreamIndicator();toast(m.e||"Generation error.","error");rmLoad();isLoading=false;sendBtn.disabled=false;streamAbort=null;return;
           }
         }catch(e){/* skip parse errors */}
       }
@@ -536,26 +527,26 @@ async function generateDoc(text,type){
     hideThink();hideStreamIndicator();
     if(full.trim()){
       const jm=full.match(/\{.*\}/s);
-      if(jm){try{const d=JSON.parse(jm[0]);const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail,documentation:renderDocumentation,generic:renderGeneric};if(rs[type]&&d&&typeof d==='object')rs[type](d);else renderGeneric(d);afterGeneration(type)}catch(e){toast("Could not parse AI response.");rmLoad();isLoading=false;sendBtn.disabled=false}}
-      else{toast("Could not parse AI response.");rmLoad();isLoading=false;sendBtn.disabled=false}
-    }else{toast("No response from AI.");rmLoad();isLoading=false;sendBtn.disabled=false}
+      if(jm){try{const d=JSON.parse(jm[0]);const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail,documentation:renderDocumentation,generic:renderGeneric};if(rs[type]&&d&&typeof d==='object')rs[type](d);else renderGeneric(d);afterGeneration(type)}catch(e){toast("Could not parse AI response.","error");rmLoad();isLoading=false;sendBtn.disabled=false}}
+      else{toast("Could not parse AI response.","error");rmLoad();isLoading=false;sendBtn.disabled=false}
+    }else{toast("No response from AI.","error");rmLoad();isLoading=false;sendBtn.disabled=false}
   }catch(e){
     clearTimeout(timeoutId);
     hideThink();hideStreamIndicator();
-    if(e.name==="AbortError"){toast("Generation cancelled.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
+    if(e.name==="AbortError"){toast("Generation cancelled.","warning");rmLoad();isLoading=false;sendBtn.disabled=false;return}
     try{
       const r=await fetch("/api/generate-resume",{
         method:"POST",headers:{"Content-Type":"application/json","X-Session-Id":sessionId||""},
         body:JSON.stringify({prompt:text,doc_type:type,model:"deepseek-chat"})
       });
       const d=await r.json();hideThink();
-      if(d.error){toast(d.error||"Generation issue.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
-      if(!d.resume){toast("Could not parse AI response.");rmLoad();isLoading=false;sendBtn.disabled=false;return}
+      if(d.error){toast(d.error||"Generation issue.","error");rmLoad();isLoading=false;sendBtn.disabled=false;return}
+      if(!d.resume){toast("Could not parse AI response.","error");rmLoad();isLoading=false;sendBtn.disabled=false;return}
       const rs={resume:renderResume,cover_letter:renderCoverLetter,proposal:renderProposal,report:renderReport,invoice:renderInvoice,email:renderEmail,documentation:renderDocumentation,generic:renderGeneric};
       if(rs[type]&&d.resume&&typeof d.resume==='object')rs[type](d.resume);
       else renderGeneric(d.resume);
       afterGeneration(type);
-    }catch(e2){hideThink();toast("Generation failed. Please try again.");rmLoad();isLoading=false;sendBtn.disabled=false}
+    }catch(e2){hideThink();toast("Generation failed. Please try again.","error");rmLoad();isLoading=false;sendBtn.disabled=false}
   }
   streamAbort=null;
 }
@@ -567,12 +558,12 @@ function doLandingSend(){
   isLoading=true;landingSend.disabled=true;
 
   const type=detectDocType(text);
-  detectionLabel.textContent=`Detected: ${docLabels[type]}`;
+  detectionLabel.textContent="Detected: "+(docLabels[type]);
   detectionBadge.classList.remove("hidden");
 
   // Include uploaded text if present
-  const fullPrompt=uploadedText ? `${text}\n\n[Attached document: ${uploadedFilename}]\n${uploadedText}` : text;
-  addMsg("user",uploadedText ? `${text} (with file: ${uploadedFilename})` : text);
+  const fullPrompt=uploadedText ? text+"\n\n[Attached document: "+uploadedFilename+"]\n"+uploadedText : text;
+  addMsg("user",uploadedText ? text+" (with file: "+uploadedFilename+")" : text);
   addLoad();
 
   setTimeout(()=>{
@@ -590,8 +581,8 @@ function send(){
   const text=chatInput.value.trim();
   if(!text||isLoading)return;
   isLoading=true;sendBtn.disabled=true;
-  const fullPrompt=uploadedText ? `${text}\n\n[Attached document: ${uploadedFilename}]\n${uploadedText}` : text;
-  addMsg("user",uploadedText ? `${text} (with file: ${uploadedFilename})` : text);
+  const fullPrompt=uploadedText ? text+"\n\n[Attached document: "+uploadedFilename+"]\n"+uploadedText : text;
+  addMsg("user",uploadedText ? text+" (with file: "+uploadedFilename+")" : text);
   addLoad();
   showSuggestions([]);
   generateDoc(fullPrompt,docType);
@@ -639,20 +630,20 @@ async function fetchCSS(){
   try{const r=await fetch("/static/css/style.css");return await r.text()}catch{return""}
 }
 async function doExport(fmt){
-  if(isLoading){toast("Please wait for generation to complete.");return}
+  if(isLoading){toast("Please wait for generation to complete.","warning");return}
   const content=cleanDocHTML();
-  if(!content||content.trim()===''||content.includes('skeleton')){toast("No document content to export.");return}
+  if(!content||content.trim()===''||content.includes('skeleton')){toast("No document content to export.","warning");return}
   const label=docLabels[docType]||"document";
   closeExportMenu();
 
   // Non-HTML-based actions
   if(fmt==="print"){window.print();return}
   if(fmt==="copy-text"){
-    try{await navigator.clipboard.writeText(docPage.textContent);toast("Text copied!")}catch{toast("Copy failed.")}
+    try{await navigator.clipboard.writeText(docPage.textContent);toast("Text copied!","success")}catch{toast("Copy failed.","error")}
     return
   }
   if(fmt==="copy-html"){
-    try{await navigator.clipboard.writeText(content);toast("HTML copied!")}catch{toast("Copy failed.")}
+    try{await navigator.clipboard.writeText(content);toast("HTML copied!","success")}catch{toast("Copy failed.","error")}
     return
   }
 
@@ -665,11 +656,11 @@ async function doExport(fmt){
     if(fmt==="html"){
       const h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+label.replace(/[<>&"]/g,'')+'</title><style>'+fullCSS+'</style></head><body><div id="docPage">'+content+'</div></body></html>';
       triggerDownload(new Blob([h],{type:"text/html"}),label+".html");
-      toast("HTML exported!");return;
+      toast("HTML exported!","success");return;
     }
 
     if(fmt==="pdf"){
-      if(typeof html2pdf==="undefined"){toast("PDF library not loaded.");hideExporting();return}
+      if(typeof html2pdf==="undefined"){toast("PDF library not loaded.","error");hideExporting();return}
       const prevOverflow=docPage.style.overflow;
       docPage.style.overflow="visible";
       try{
@@ -685,15 +676,15 @@ async function doExport(fmt){
         throw pdfErr;
       }
       docPage.style.overflow=prevOverflow;
-      toast("PDF exported!");return;
+      toast("PDF exported!","success");return;
     }
 
     if(fmt==="docx"){
       const h='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]--><style>'+fullCSS+'</style></head><body><div id="docPage">'+content+'</div></body></html>';
       triggerDownload(new Blob([h],{type:"application/msword"}),label+".docx");
-      toast("DOCX downloaded!");return;
+      toast("DOCX downloaded!","success");return;
     }
-  }catch(exc){toast("Export failed. Please try again.")}
+  }catch(exc){toast("Export failed. Please try again.","error")}
   finally{hideExporting()}
 }
 
@@ -746,7 +737,7 @@ function goToLanding(){
   landingPage.style.opacity="";landingPage.style.transform="";
   chatMessages.innerHTML="";
   const sk=document.querySelector("#skeleton");
-  const skHTML=sk?sk.outerHTML:'<div id="skeleton" class="skeleton-doc"><div class="sk-block w-40" style="height:22px;margin:30px auto;border-radius:4px"></div><div class="sk-block w-70" style="height:9px;margin:0 auto 20px;border-radius:4px"></div><div class="sk-block w-25" style="height:11px;margin:10px 0 6px;border-radius:4px"></div><div class="sk-block w-90" style="height:8px;margin:4px 0;border-radius:4px"></div><div class="sk-block w-75" style="height:8px;margin:4px 0;border-radius:4px"></div><div class="sk-block w-25" style="height:11px;margin:14px 0 6px;border-radius:4px"></div><div class="sk-block w-95" style="height:8px;margin:4px 0;border-radius:4px"></div></div>';
+  const skHTML=sk?sk.outerHTML:'<div id="skeleton" class="skeleton-doc"><div class="sk-block w-40" style="height:20px;margin:30px auto;border-radius:4px"></div><div class="sk-block w-70" style="height:8px;margin:0 auto 18px;border-radius:4px"></div><div class="sk-block w-25" style="height:10px;margin:10px 0 5px;border-radius:4px"></div><div class="sk-block w-90" style="height:7px;margin:3px 0"></div><div class="sk-block w-75" style="height:7px;margin:3px 0"></div><div class="sk-block w-25" style="height:10px;margin:14px 0 5px"></div><div class="sk-block w-95" style="height:7px;margin:3px 0"></div></div>';
   docPage.innerHTML=skHTML;
   docPage.classList.remove("loaded");
   suggestions.classList.add("hidden");hideThink();docData=null;
@@ -762,7 +753,6 @@ $("#zoomIn").addEventListener("click",zoomIn);$("#zoomOut").addEventListener("cl
 
 /* ─── TOOLBAR — exec all commands ─── */
 function exec(cmd,val){docPage.focus();document.execCommand(cmd,false,val||null)}
-function setId(id,val){const e=document.getElementById(id);if(e)e.value=val}
 
 // Enable CSS-styled font sizes
 document.execCommand("styleWithCSS",false,true);
@@ -774,12 +764,12 @@ document.getElementById("redoBtn")?.addEventListener("click",()=>exec("redo"));
 // Formatting toggles
 [["boldBtn","bold"],["italicBtn","italic"],["underlineBtn","underline"],["strikeBtn","strikeThrough"],
  ["ulBtn","insertUnorderedList"],["olBtn","insertOrderedList"],
- ["outdentBtn","outdent"],["indentBtn","indent"],["cleanBtn","removeFormat"]]
-.forEach(([id,cmd])=>{const e=document.getElementById(id);if(e)e.addEventListener("click",()=>exec(cmd))});
+ ["cleanBtn","removeFormat"]]
+.forEach(([id,cmd])=>{const e=document.getElementById(id);if(e)e.addEventListener("click",()=>{exec(cmd);updateToolbarState()})});
 
 // Alignment
 [["alignLeftBtn","justifyLeft"],["alignCenterBtn","justifyCenter"],["alignRightBtn","justifyRight"],["alignJustifyBtn","justifyFull"]]
-.forEach(([id,cmd])=>{const e=document.getElementById(id);if(e)e.addEventListener("click",()=>exec(cmd))});
+.forEach(([id,cmd])=>{const e=document.getElementById(id);if(e)e.addEventListener("click",()=>{exec(cmd);updateToolbarState()})});
 
 // Style select — apply block format & track active
 const styleEl=document.getElementById("styleSelect");
@@ -789,12 +779,13 @@ if(styleEl){
     const map={p:"<p>",h1:"<h1>",h2:"<h2>",h3:"<h3>",blockquote:"<blockquote>",pre:"<pre>"};
     if(map[v])exec("formatBlock",map[v]);
     this.blur();
+    updateToolbarState();
   });
 }
 
 // Font select
 const fontEl=document.getElementById("fontSelect");
-if(fontEl)fontEl.addEventListener("change",function(){exec("fontName",this.value);this.blur()});
+if(fontEl)fontEl.addEventListener("change",function(){exec("fontName",this.value);this.blur();updateToolbarState()});
 
 // Font size — use inline CSS for real pt values
 const sizeEl=document.getElementById("sizeSelect");
@@ -802,9 +793,7 @@ if(sizeEl){
   sizeEl.addEventListener("change",function(){
     docPage.focus();
     const size=this.value;
-    // Use CSS fontSize via execCommand with fontSize then replace with inline style
-    exec("fontSize","7"); // temporary large size marker
-    // Find all font tags with size 7 and replace with inline style
+    exec("fontSize","7");
     const markers=docPage.querySelectorAll('font[size="7"]');
     markers.forEach(el=>{
       const span=document.createElement("span");
@@ -813,12 +802,13 @@ if(sizeEl){
       el.parentNode.replaceChild(span,el);
     });
     this.blur();
+    updateToolbarState();
   });
 }
 
 // Colors
-document.getElementById("textColorInput")?.addEventListener("input",function(){exec("foreColor",this.value)});
-document.getElementById("hiliteColorInput")?.addEventListener("input",function(){exec("hiliteColor",this.value)});
+document.getElementById("textColorInput")?.addEventListener("input",function(){exec("foreColor",this.value);updateToolbarState()});
+document.getElementById("hiliteColorInput")?.addEventListener("input",function(){exec("hiliteColor",this.value);updateToolbarState()});
 
 // Image — support URL + file upload
 document.getElementById("imageBtn")?.addEventListener("click",()=>{
@@ -827,7 +817,7 @@ document.getElementById("imageBtn")?.addEventListener("click",()=>{
     if(!this.files||!this.files[0])return;
     const reader=new FileReader();
     reader.onload=function(e){
-      docPage.focus();exec("insertImage",e.target.result);
+      docPage.focus();exec("insertImage",e.target.result);updateToolbarState();
     };
     reader.readAsDataURL(this.files[0]);
   };
@@ -838,17 +828,17 @@ document.getElementById("imageBtn")?.addEventListener("click",()=>{
 document.getElementById("linkBtn")?.addEventListener("click",()=>{
   const sel=window.getSelection().toString();
   const url=prompt("Enter link URL:","https://");
-  if(url){docPage.focus();exec("createLink",url);}
-  else if(sel){docPage.focus();exec("unlink");}
+  if(url){docPage.focus();exec("createLink",url);updateToolbarState();}
+  else if(sel){docPage.focus();exec("unlink");updateToolbarState();}
 });
 
 // Table
 document.getElementById("tableBtn")?.addEventListener("click",()=>{
   const rows=prompt("Rows:","2")||2,cols=prompt("Columns:","2")||2;
-  let html='<table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;margin:6px 0">';
-  for(let r=0;r<rows;r++){html+="<tr>";for(let c=0;c<cols;c++)html+=`<td style="min-width:40px">Cell</td>`;html+="</tr>"}
+  let html='<table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;margin:6px 0;font-size:9pt">';
+  for(let r=0;r<rows;r++){html+="<tr>";for(let c=0;c<cols;c++)html+=`<td style="min-width:40px;padding:4px 6px;border:1px solid #d2d2d6">Cell</td>`;html+="</tr>"}
   html+="</table>";
-  docPage.focus();document.execCommand("insertHTML",false,html);
+  docPage.focus();document.execCommand("insertHTML",false,html);updateToolbarState();
 });
 
 /* ─── DYNAMIC TOOLBAR STATE TRACKING ─── */
@@ -894,20 +884,26 @@ function updateToolbarState(){
 
 docPage.addEventListener("mouseup",updateToolbarState);
 docPage.addEventListener("keyup",updateToolbarState);
-docPage.addEventListener("input",updateToolbarState);
+
+// Also update on selection change to keep toolbar in sync
+document.addEventListener("selectionchange",debounce(function(){
+  if(editorVisible&&document.activeElement&&docPage.contains(document.activeElement)){
+    updateToolbarState();
+  }
+},100));
 
 /* ─── KEYBOARD SHORTCUTS ─── */
 docPage.addEventListener("keydown",function(e){
   const mod=/(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)?e.metaKey:e.ctrlKey;
   if(!mod)return;
-  if(e.key==="z"){e.preventDefault();exec(e.shiftKey?"redo":"undo")}
-  if(e.key==="y"){e.preventDefault();exec("redo")}
-  if(e.key==="b"){e.preventDefault();exec("bold")}
-  if(e.key==="i"){e.preventDefault();exec("italic")}
-  if(e.key==="u"){e.preventDefault();exec("underline")}
+  if(e.key==="z"){e.preventDefault();exec(e.shiftKey?"redo":"undo");updateToolbarState()}
+  if(e.key==="y"){e.preventDefault();exec("redo");updateToolbarState()}
+  if(e.key==="b"){e.preventDefault();exec("bold");updateToolbarState()}
+  if(e.key==="i"){e.preventDefault();exec("italic");updateToolbarState()}
+  if(e.key==="u"){e.preventDefault();exec("underline");updateToolbarState()}
 });
 
-// Doc action (moved to export bar)
+// Doc action
 $("#docActionBtn")?.addEventListener("click",()=>{
   const sug=docSuggestions[docType]||["Improve","Polish","Export"];
   chatInput.value=sug[0]||"Improve this document";chatInput.focus();

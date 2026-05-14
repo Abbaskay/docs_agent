@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: ai-doc
+    runtime: python
+    repo: https://github.com/hyperzod/ai_doc
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 --access-logfile - --error-logfile - --timeout 120 wsgi:app
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: HOST
+        value: 0.0.0.0
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-doc-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ai-doc-redis
+          property: connectionString
+
+databases:
+  - name: ai-doc-db
+    plan: free
+    region: oregon
+    databaseName: aidoc
+    ipAllowList: []
+
+redis:
+  - name: ai-doc-redis
+    plan: free
+    region: oregon
+    ipAllowList: []
